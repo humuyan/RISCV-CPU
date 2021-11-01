@@ -77,24 +77,40 @@ assign {
     uart_rdn, uart_wrn
 } = ram_enable[7:0];
 
-wire byte_sign;
-assign byte_sign = addr[1:0] == 2'b00 ? base_ram_data[7] : 
-                  (addr[1:0] == 2'b01 ? base_ram_data[15] :
-                  (addr[1:0] == 2'b10 ? base_ram_data[23] : base_ram_data[31]));
+wire base_byte_sign;
+assign base_byte_sign = addr[1:0] == 2'b00 ? base_ram_data[7] : 
+                        (addr[1:0] == 2'b01 ? base_ram_data[15] :
+                        (addr[1:0] == 2'b10 ? base_ram_data[23] : base_ram_data[31]));
 
-wire[7:0] byte_data;
-assign byte_data = addr[1:0] == 2'b00 ? base_ram_data[7:0] : 
-                  (addr[1:0] == 2'b01 ? base_ram_data[15:8] :
-                  (addr[1:0] == 2'b10 ? base_ram_data[23:16] : base_ram_data[31:24]));
+wire[7:0] base_byte_data;
+assign base_byte_data = addr[1:0] == 2'b00 ? base_ram_data[7:0] : 
+                        (addr[1:0] == 2'b01 ? base_ram_data[15:8] :
+                        (addr[1:0] == 2'b10 ? base_ram_data[23:16] : base_ram_data[31:24]));
+
+
+wire ext_byte_sign;
+assign ext_byte_sign = addr[1:0] == 2'b00 ? ext_ram_data[7] : 
+                        (addr[1:0] == 2'b01 ? ext_ram_data[15] :
+                        (addr[1:0] == 2'b10 ? ext_ram_data[23] : ext_ram_data[31]));
+
+wire[7:0] ext_byte_data;
+assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] : 
+                        (addr[1:0] == 2'b01 ? ext_ram_data[15:8] :
+                        (addr[1:0] == 2'b10 ? ext_ram_data[23:16] : ext_ram_data[31:24]));
+
 
 always_comb begin
     case (ram_enable)
         READ_BASE: case (inst[1:0])
-            `MEM_BYTE: cur_data_out = {{24{byte_sign}}, byte_data};
+            `MEM_BYTE: cur_data_out = {{24{base_byte_sign}}, base_byte_data};
             `MEM_WORD: cur_data_out = base_ram_data;
             default: begin end
         endcase
-        READ_EXT: cur_data_out = ext_ram_data;
+        READ_EXT: case (inst[1:0])
+            `MEM_BYTE: cur_data_out = {{24{ext_byte_sign}}, ext_byte_data};
+            `MEM_WORD: cur_data_out = ext_ram_data;
+            default: begin end
+        endcase
         READ_UART: cur_data_out = { 24'b0, base_ram_data[7:0] };
         READ_UART_STATE: cur_data_out = { 26'b0, uart_tbre && uart_tsre, 4'b0, uart_dataready };
         default: begin end
