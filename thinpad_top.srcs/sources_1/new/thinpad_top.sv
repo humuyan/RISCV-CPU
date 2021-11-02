@@ -234,6 +234,9 @@ end
 
 // mem
 always_comb begin
+    mem_data_in = 32'b0;
+    mem_addr = 32'b0;
+    mem_inst = `MEM_IDLE_IDLE;
     if (mem_occupied_by == MEM_MEM) begin
         case (mem_wb_op)
             `OP_LB, `OP_LW: begin

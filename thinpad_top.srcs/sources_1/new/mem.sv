@@ -104,6 +104,7 @@ assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] :
 
 
 always_comb begin
+    cur_data_out = 32'b0;
     case (ram_enable)
         READ_BASE: case (inst[1:0])
             `MEM_BYTE: cur_data_out = {{24{base_byte_sign}}, base_byte_data};
@@ -150,6 +151,12 @@ always_ff @(posedge clk or posedge rst) begin
                             end
                             `MEM_BYTE: begin
                                 ram_enable <= READ_BASE; // read because I should read first and replace
+                                case(addr[1:0])
+                                    2'b00: cur_data_in <= {base_ram_data[31:8], cur_data_in[7:0]}; // little endian
+                                    2'b01: cur_data_in <= {base_ram_data[31:16], cur_data_in[7:0], base_ram_data[7:0]};
+                                    2'b10: cur_data_in <= {base_ram_data[31:24], cur_data_in[7:0], base_ram_data[15:0]};
+                                    2'b11: cur_data_in <= {cur_data_in[7:0], base_ram_data[23:0]};                    
+                                endcase
                                 state <= S_WRITE_RAM_BYTE_READ;
                             end
                             default: begin end
@@ -235,12 +242,6 @@ always_ff @(posedge clk or posedge rst) begin
                     READ_BASE: ram_enable <= WRITE_BASE;
                     READ_EXT: ram_enable <= WRITE_EXT;
                     default: begin end
-                endcase
-                case(addr[1:0])
-                    2'b00: cur_data_in <= {base_ram_data[31:8], cur_data_in[7:0]}; // little endian
-                    2'b01: cur_data_in <= {base_ram_data[31:16], cur_data_in[15:8], base_ram_data[7:0]};
-                    2'b10: cur_data_in <= {base_ram_data[31:24], cur_data_in[23:16], base_ram_data[15:0]};
-                    2'b11: cur_data_in <= {cur_data_in[31:24], base_ram_data[23:0]};                    
                 endcase
                 state <= S_WRITE_RAM;
             end
