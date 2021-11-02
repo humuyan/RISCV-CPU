@@ -83,9 +83,6 @@ module thinpad_top(
     output wire video_de           //行数据有效信号，用于区分消隐区
 );
 
-assign base_ram_be_n = 4'b0000;
-assign ext_ram_be_n = 4'b0000;
-
 // 数码管连接关系示意图，dpy1同理
 // p=dpy0[0] // ---a---
 // c=dpy0[1] // |     |
@@ -131,12 +128,14 @@ mem _mem(
 
     .base_ram_data(base_ram_data),
     .base_ram_addr(base_ram_addr),
+    .base_ram_be_n(base_ram_be_n),
     .base_ram_ce_n(base_ram_ce_n),
     .base_ram_oe_n(base_ram_oe_n),
     .base_ram_we_n(base_ram_we_n),
 
     .ext_ram_data(ext_ram_data),
     .ext_ram_addr(ext_ram_addr),
+    .ext_ram_be_n(ext_ram_be_n),
     .ext_ram_ce_n(ext_ram_ce_n),
     .ext_ram_oe_n(ext_ram_oe_n),
     .ext_ram_we_n(ext_ram_we_n),

@@ -16,12 +16,14 @@ module mem (
     // ram
     inout wire[31:0] base_ram_data,  //BaseRAM数据，低8位与CPLD串口控制器共享
     output wire[19:0] base_ram_addr, //BaseRAM地址
+    output wire[3:0] base_ram_be_n,
     output wire base_ram_ce_n,       //BaseRAM片选，低有效
     output wire base_ram_oe_n,       //BaseRAM读使能，低有效
     output wire base_ram_we_n,       //BaseRAM写使能，低有效
 
     inout wire[31:0] ext_ram_data,  //ExtRAM数据
     output wire[19:0] ext_ram_addr, //ExtRAM地址
+    output wire[3:0] ext_ram_be_n,
     output wire ext_ram_ce_n,       //ExtRAM片选，低有效
     output wire ext_ram_oe_n,       //ExtRAM读使能，低有效
     output wire ext_ram_we_n,       //ExtRAM写使能，低有效
@@ -54,6 +56,8 @@ assign base_ram_data = ((ram_enable == WRITE_BASE) || (ram_enable == WRITE_UART)
 assign ext_ram_data = (ram_enable == WRITE_EXT) ? cur_data_in : 32'bz;
 assign data_out = cur_data_out;
 assign state_out = state;
+assign base_ram_be_n = 4'b0000;
+assign ext_ram_be_n = 4'b0000;
 
 reg[3:0] state;
 localparam S_IDLE = 0;
@@ -90,13 +94,13 @@ assign base_byte_data = addr[1:0] == 2'b00 ? base_ram_data[7:0] :
 
 wire ext_byte_sign;
 assign ext_byte_sign = addr[1:0] == 2'b00 ? ext_ram_data[7] : 
-                        (addr[1:0] == 2'b01 ? ext_ram_data[15] :
-                        (addr[1:0] == 2'b10 ? ext_ram_data[23] : ext_ram_data[31]));
+                       (addr[1:0] == 2'b01 ? ext_ram_data[15] :
+                       (addr[1:0] == 2'b10 ? ext_ram_data[23] : ext_ram_data[31]));
 
 wire[7:0] ext_byte_data;
 assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] : 
-                        (addr[1:0] == 2'b01 ? ext_ram_data[15:8] :
-                        (addr[1:0] == 2'b10 ? ext_ram_data[23:16] : ext_ram_data[31:24]));
+                       (addr[1:0] == 2'b01 ? ext_ram_data[15:8] :
+                       (addr[1:0] == 2'b10 ? ext_ram_data[23:16] : ext_ram_data[31:24]));
 
 
 always_comb begin
@@ -117,7 +121,7 @@ always_comb begin
     endcase
 end
 
-assign done = (state == S_DONE) ? 1'b1 : 1'b0;
+assign done = (state == S_DONE || state == S_READ_RAM || state == S_WRITE_RAM) ? 1'b1 : 1'b0;
 assign idle = (state == S_IDLE) ? 1'b1 : 1'b0;
 
 
@@ -193,8 +197,14 @@ always_ff @(posedge clk or posedge rst) begin
                     end
                 endcase
             end
-            S_READ_RAM: state <= S_DONE;
-            S_WRITE_RAM: state <= S_DONE;
+            S_READ_RAM: begin
+                ram_enable <= IDLE;
+                state <= S_IDLE;
+            end
+            S_WRITE_RAM: begin
+                ram_enable <= IDLE;
+                state <= S_IDLE;
+            end
             S_READ_UART: begin
                 if (uart_dataready == 1) begin
                     ram_enable <= READ_UART;
