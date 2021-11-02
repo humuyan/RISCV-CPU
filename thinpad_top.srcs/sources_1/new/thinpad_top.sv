@@ -234,10 +234,12 @@ end
 
 // mem
 always_comb begin
+    mem_inst = `MEM_IDLE_IDLE;
+    mem_addr = 32'b0;
+    mem_data_in = 32'b0;
     if (mem_occupied_by == MEM_MEM) begin
         case (mem_wb_op)
             `OP_LB, `OP_LW: begin
-                mem_data_in = 32'b0;
                 mem_addr = mem_exe_result;
                 case (mem_wb_op)
                     `OP_LB: mem_inst = `MEM_READ_BYTE;
@@ -246,7 +248,8 @@ always_comb begin
                 endcase
             end
             `OP_SB, `OP_SW: begin
-                mem_data_in = (wb_reg_d == mem_reg_t && wb_reg_d != 5'b0) ? wb_exe_result : mem_exe_reg_t_val;
+                mem_data_in = (wb_reg_d == mem_reg_t && wb_reg_d != 5'b0) ? wb_exe_result : 
+                             ((after_wb_reg_d == mem_reg_t && after_wb_reg_d != 5'b0) ? after_wb_exe_result : mem_exe_reg_t_val);
                 mem_addr = mem_exe_result;
                 case (mem_wb_op)
                     `OP_SB: mem_inst = `MEM_WRITE_BYTE;
@@ -286,8 +289,10 @@ always_comb begin
 end
 
 wire[31:0] raw_exe_reg_s_val, raw_exe_reg_t_val;
-assign raw_exe_reg_s_val = ((mem_reg_d == exe_reg_s && mem_reg_d != 5'b0) ? mem_exe_result : exe_reg_s_val);
-assign raw_exe_reg_t_val = ((mem_reg_d == exe_reg_t && mem_reg_d != 5'b0) ? mem_exe_result : exe_reg_t_val);
+assign raw_exe_reg_s_val = ((mem_reg_d == exe_reg_s && mem_reg_d != 5'b0) ? mem_exe_result : 
+                            (wb_reg_d == exe_reg_s && wb_reg_d != 5'b0) ? wb_exe_result : exe_reg_s_val);
+assign raw_exe_reg_t_val = ((mem_reg_d == exe_reg_t && mem_reg_d != 5'b0) ? mem_exe_result : 
+                            (wb_reg_d == exe_reg_t && wb_reg_d != 5'b0) ? wb_exe_result : exe_reg_t_val);
 
 alu _alu(
     .op(alu_op),
@@ -308,6 +313,8 @@ reg[31:0] mem_exe_result;
 reg[4:0] mem_reg_s, mem_reg_t, mem_reg_d;
 reg[31:0] wb_exe_result;
 reg[4:0] wb_reg_s, wb_reg_t, wb_reg_d;
+reg[31:0] after_wb_exe_result;
+reg[4:0] after_wb_reg_s, after_wb_reg_t, after_wb_reg_d;
 
 localparam INST_INVALID = 32'b0;
 
@@ -369,6 +376,12 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                 wb_reg_s <= mem_reg_s;
                 wb_reg_t <= mem_reg_t;
                 wb_reg_d <= mem_reg_d;
+
+                // WB
+                after_wb_exe_result <= wb_exe_result;
+                after_wb_reg_s <= wb_reg_s;
+                after_wb_reg_t <= wb_reg_t;
+                after_wb_reg_d <= wb_reg_d;
                 
             end else begin
                 mem_occupied_by <= MEM_IF;
