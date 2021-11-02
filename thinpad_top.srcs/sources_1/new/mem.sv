@@ -151,12 +151,6 @@ always_ff @(posedge clk or posedge rst) begin
                             end
                             `MEM_BYTE: begin
                                 ram_enable <= READ_BASE; // read because I should read first and replace
-                                case(addr[1:0])
-                                    2'b00: cur_data_in <= {base_ram_data[31:8], cur_data_in[7:0]}; // little endian
-                                    2'b01: cur_data_in <= {base_ram_data[31:16], cur_data_in[7:0], base_ram_data[7:0]};
-                                    2'b10: cur_data_in <= {base_ram_data[31:24], cur_data_in[7:0], base_ram_data[15:0]};
-                                    2'b11: cur_data_in <= {cur_data_in[7:0], base_ram_data[23:0]};                    
-                                endcase
                                 state <= S_WRITE_RAM_BYTE_READ;
                             end
                             default: begin end
@@ -239,8 +233,24 @@ always_ff @(posedge clk or posedge rst) begin
             end
             S_WRITE_RAM_BYTE_READ: begin
                 case (ram_enable)
-                    READ_BASE: ram_enable <= WRITE_BASE;
-                    READ_EXT: ram_enable <= WRITE_EXT;
+                    READ_BASE: begin
+                        ram_enable <= WRITE_BASE;
+                        case(addr[1:0])
+                            2'b00: cur_data_in <= {base_ram_data[31:8], cur_data_in[7:0]}; // little endian
+                            2'b01: cur_data_in <= {base_ram_data[31:16], cur_data_in[7:0], base_ram_data[7:0]};
+                            2'b10: cur_data_in <= {base_ram_data[31:24], cur_data_in[7:0], base_ram_data[15:0]};
+                            2'b11: cur_data_in <= {cur_data_in[7:0], base_ram_data[23:0]};                    
+                        endcase
+                    end
+                    READ_EXT: begin
+                        ram_enable <= WRITE_EXT;
+                        case(addr[1:0])
+                            2'b00: cur_data_in <= {ext_ram_data[31:8], cur_data_in[7:0]}; // little endian
+                            2'b01: cur_data_in <= {ext_ram_data[31:16], cur_data_in[7:0], ext_ram_data[7:0]};
+                            2'b10: cur_data_in <= {ext_ram_data[31:24], cur_data_in[7:0], ext_ram_data[15:0]};
+                            2'b11: cur_data_in <= {cur_data_in[7:0], ext_ram_data[23:0]};                    
+                        endcase
+                    end
                     default: begin end
                 endcase
                 state <= S_WRITE_RAM;
