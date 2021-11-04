@@ -250,7 +250,7 @@ always_comb begin
                 pc_jumping = 1'b1;
                 next_pc = exe_result;
             end
-            else next_pc = pc + 32'h4;
+            else next_pc = exe_mem_pc + 32'h4;
         end
         `OP_BNE: begin
             is_jump_op = 1'b1;
@@ -258,14 +258,14 @@ always_comb begin
                 pc_jumping = 1'b1;
                 next_pc = exe_result;
             end
-            else next_pc = pc + 32'h4;
+            else next_pc = exe_mem_pc + 32'h4;
         end
         `OP_JAL, `OP_JALR: begin
             is_jump_op = 1'b1;
             pc_jumping = 1'b1;
             next_pc = exe_result;
         end
-        default: next_pc = pc + 32'h4;
+        default: next_pc = exe_mem_pc + 32'h4;
     endcase
 end
 
@@ -377,8 +377,7 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                 // PC (in exe state)       
                 id_exe_pred_pc <= pred_pc;
                 exe_mem_pred_pc <= id_exe_pred_pc;
-                
-                if (pc_jumping) begin
+                if (exe_mem_pred_pc != next_pc) begin
                     num_reg <= 8'h01;
                     pc <= next_pc; // pred failed, use next_pc and stop the pipeline
                     reg_inst <= INST_INVALID; 
