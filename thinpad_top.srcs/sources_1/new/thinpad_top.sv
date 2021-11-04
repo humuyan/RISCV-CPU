@@ -98,7 +98,8 @@ module thinpad_top(
 wire[7:0] number;
 SEG7_LUT segL(.oSEG1(dpy0), .iDIG(number[3:0])); //dpy0是低位数码管
 SEG7_LUT segH(.oSEG1(dpy1), .iDIG(number[7:4])); //dpy1是高位数码管
-assign number = 8'b0;
+reg[7:0] num_reg;
+assign number = num_reg;
 assign leds = pc[15:0];
 
 // interface to memory
@@ -343,12 +344,12 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
     end else begin
         if (mem_done) begin
             if (mem_occupied_by == MEM_IF) begin          
-
                 // PC (in exe state)       
                 id_exe_pred_pc <= pred_pc;
                 exe_mem_pred_pc <= id_exe_pred_pc;
                 
                 if (is_jump_op && exe_mem_pred_pc != next_pc) begin
+                    num_reg <= 8'h01;
                     pc <= next_pc; // pred failed, use next_pc and stop the pipeline
                     reg_inst <= INST_INVALID; 
                     exe_mem_op <= `OP_INVALID;
@@ -362,6 +363,7 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                     exe_imm <= 0;
                     exe_imm_select <= 0;
                 end else begin
+                    num_reg <= 8'h00;
                     pc <= pred_pc; // pred success or sequential, use pred_pc is ok
                     reg_inst <= mem_data_out;
                     exe_mem_op <= id_exe_op;
