@@ -36,11 +36,11 @@ module mem (
     input wire uart_tsre         //数据发送完毕标志
 );
 
+reg[8:0] done_ram_enable;
 reg[8:0] ram_enable;
 reg[31:0] cur_addr;
 reg[31:0] cur_data_in;
 reg[31:0] cur_data_out;
-reg[31:0] ram_data;
 reg[3:0] ram_be_n;
 
 localparam IDLE = 9'b111111111;
@@ -104,21 +104,21 @@ assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] :
 
 
 always_comb begin
-    ram_data = 32'b0;
+    cur_data_out = 32'b0;
     case ({inst[3:2], addr[28], addr[22]})
         `MEM_READ_BASE: case (inst[1:0])
-            `MEM_BYTE: ram_data = {{24{base_byte_sign}}, base_byte_data};
-            `MEM_WORD: ram_data = base_ram_data;
+            `MEM_BYTE: cur_data_out = {{24{base_byte_sign}}, base_byte_data};
+            `MEM_WORD: cur_data_out = base_ram_data;
             default: begin end
         endcase
         `MEM_READ_EXT: case (inst[1:0])
-            `MEM_BYTE: ram_data = {{24{ext_byte_sign}}, ext_byte_data};
-            `MEM_WORD: ram_data = ext_ram_data;
+            `MEM_BYTE: cur_data_out = {{24{ext_byte_sign}}, ext_byte_data};
+            `MEM_WORD: cur_data_out = ext_ram_data;
             default: begin end
         endcase
         `MEM_READ_UART: case (addr[2:0])
-            3'b101: ram_data = { 26'b0, uart_tbre && uart_tsre, 4'b0, uart_dataready }; // state
-            3'b000: ram_data = { 24'b0, base_ram_data[7:0] }; // data
+            3'b101: cur_data_out = { 26'b0, uart_tbre && uart_tsre, 4'b0, uart_dataready }; // state
+            3'b000: cur_data_out = { 24'b0, base_ram_data[7:0] }; // data
             default: begin end
         endcase
         default: begin end
@@ -134,11 +134,10 @@ reg[3:0] next_state;
 always_comb begin
     ram_be_n = 4'b0000;
     ram_enable = IDLE;
-    cur_addr = 32'b0;
+    cur_addr = { 12'b0, addr[21:2] };
     cur_data_in = data_in;
     case(state)
         S_IDLE, S_RW_RAM: begin
-            cur_addr = { 12'b0, addr[21:2] };
             case ({inst[3:2], addr[28], addr[22]})
                 `MEM_READ_BASE: begin
                     ram_enable = READ_BASE;
@@ -271,7 +270,7 @@ always_comb begin
             next_state = S_DONE;
         end
         S_DONE: begin
-            ram_enable = IDLE;
+            ram_enable = done_ram_enable;
             next_state = S_RW_RAM;
         end
         default: next_state = S_IDLE;
@@ -283,8 +282,8 @@ always_ff @(posedge clk or posedge rst) begin
         state <= S_IDLE;
     end else begin
         state <= next_state;
-        if (next_state == S_DONE) cur_data_out <= ram_data;
-        else cur_data_out <= 32'bz;
+        if (next_state == S_DONE) done_ram_enable <= ram_enable;
+        else done_ram_enable <= IDLE;
     end
 end
 
