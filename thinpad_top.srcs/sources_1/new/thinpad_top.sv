@@ -178,7 +178,9 @@ regfile _regfile(
     .raddr1(reg_s),
     .rdata1(reg_rdata1),
     .raddr2(reg_t),
-    .rdata2(reg_rdata2)
+    .rdata2(reg_rdata2),
+    .raddr3(reg_pred_s),
+    .rdata3(reg_pred_s_data)
 );
 
 reg[4:0] exe_reg_d;
@@ -205,32 +207,53 @@ always_comb begin
     endcase
 end
 
+reg[31:0] pc, next_pc; // next pc is the real instruction after exe_mem_pc!
+reg[31:0] id_exe_pc, exe_mem_pc, mem_wb_pc;
 // pc in exe state
-reg pc_jumping;
+reg is_jump_op, pc_jumping;
 always_comb begin
     pc_jumping = 1'b0;
+    is_jump_op = 1'b0;
     case (exe_mem_op)
-        `OP_BEQ: begin
-            if (raw_exe_reg_s_val == raw_exe_reg_t_val) begin
-                pc_jumping = 1'b1;
-                next_pc = exe_result;
-            end
-            else next_pc = pc + 32'h4;
-        end
-        `OP_BNE: begin
-            if (raw_exe_reg_s_val != raw_exe_reg_t_val) begin
-                pc_jumping = 1'b1;
-                next_pc = exe_result;
-            end
-            else next_pc = pc + 32'h4;
+        `OP_BEQ, `OP_BNE, `OP_BLT, `OP_BGE, `OP_BLTU, `OP_BGEU: begin
+            is_jump_op = 1'b1;
+            case (exe_mem_op)
+                `OP_BEQ: pc_jumping = (raw_exe_reg_s_val == raw_exe_reg_t_val);
+                `OP_BNE: pc_jumping = (raw_exe_reg_s_val != raw_exe_reg_t_val);
+                `OP_BLT: pc_jumping = ($signed(raw_exe_reg_s_val) < $signed(raw_exe_reg_t_val));
+                `OP_BGE: pc_jumping = ($signed(raw_exe_reg_t_val) >= $signed(raw_exe_reg_t_val));
+                `OP_BLTU: pc_jumping = (raw_exe_reg_s_val < raw_exe_reg_t_val);
+                `OP_BGEU: pc_jumping = (raw_exe_reg_s_val >= raw_exe_reg_t_val);
+                default: pc_jumping = 1'b0;
+            endcase
+            if (pc_jumping) next_pc = exe_result; 
+            else next_pc = exe_mem_pc + 32'h4;
         end
         `OP_JAL, `OP_JALR: begin
+            is_jump_op = 1'b1;
             pc_jumping = 1'b1;
             next_pc = exe_result;
         end
-        default: next_pc = pc + 32'h4;
+        default: next_pc = exe_mem_pc + 32'h4;
     endcase
 end
+
+reg[4:0] reg_pred_s;
+reg[31:0] reg_pred_s_data;
+reg[31:0] pred_pc;
+reg[31:0] id_exe_pred_pc, exe_mem_pred_pc;
+// pred pc
+branch_pred _branch_pred(
+    .clk(clk_50M),
+    .is_jump_op(is_jump_op),
+    .last_jump_pc(exe_mem_pc[4:2]),
+    .last_jump_result(pc_jumping),
+    .inst(mem_data_out),
+    .pc(pc),
+    .reg_s_val(reg_pred_s_data),
+    .reg_s(reg_pred_s),
+    .pred_pc(pred_pc)
+);
 
 // mem
 always_comb begin
@@ -300,8 +323,6 @@ alu _alu(
     .flags(exe_flags)
 );
 
-reg[31:0] pc, next_pc;
-reg[31:0] id_exe_pc, exe_mem_pc, mem_wb_pc;
 reg[`OP_LENGTH_1:0] mem_wb_op; // current id_exe_op in x state
 // some reg info passed by ALU
 
@@ -323,10 +344,12 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
         if (mem_done) begin
             if (mem_occupied_by == MEM_IF) begin          
 
-                // PC (in exe state)
-                pc <= next_pc;
-                // if jump, shut down current instruction in ID and EXE
-                if (pc_jumping) begin
+                // PC (in exe state)       
+                id_exe_pred_pc <= pred_pc;
+                exe_mem_pred_pc <= id_exe_pred_pc;
+                
+                if (is_jump_op && exe_mem_pred_pc != next_pc) begin
+                    pc <= next_pc; // pred failed, use next_pc and stop the pipeline
                     reg_inst <= INST_INVALID; 
                     exe_mem_op <= `OP_INVALID;
                     id_exe_pc <= 0;
@@ -338,7 +361,8 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                     exe_reg_d <= 0;
                     exe_imm <= 0;
                     exe_imm_select <= 0;
-                end else begin 
+                end else begin
+                    pc <= pred_pc; // pred success or sequential, use pred_pc is ok
                     reg_inst <= mem_data_out;
                     exe_mem_op <= id_exe_op;
                     id_exe_pc <= pc;

@@ -76,6 +76,10 @@ module decoder(
                 case (inst[14:12])
                     3'b000: op = `OP_BEQ;
                     3'b001: op = `OP_BNE;
+                    3'b100: op = `OP_BLT;
+                    3'b101: op = `OP_BGE;
+                    3'b110: op = `OP_BLTU;
+                    3'b111: op = `OP_BGEU;
                     default: begin end
                 endcase
             end

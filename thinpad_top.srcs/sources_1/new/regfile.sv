@@ -11,7 +11,9 @@ module regfile(
     input wire[4:0]     raddr1,
     output reg[31:0]    rdata1,
     input wire[4:0]     raddr2,
-    output reg[31:0]    rdata2
+    output reg[31:0]    rdata2,
+    input wire[4:0]     raddr3,
+    output reg[31:0]    rdata3 // for branch pred
     );
     
     reg[31:0] registers[0:31];
@@ -64,5 +66,10 @@ module regfile(
     always_comb begin
         if (raddr2 == 5'b0) rdata2 = 32'b0;
         else rdata2 = registers[raddr2];
+    end
+
+    always_comb begin
+        if (raddr3 == 5'b0) rdata3 = 32'b0;
+        else rdata3 = registers[raddr3];
     end
 endmodule

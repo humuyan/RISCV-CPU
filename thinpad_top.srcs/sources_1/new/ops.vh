@@ -20,3 +20,7 @@
 `define OP_SRLI `OP_LENGTH'h11
 `define OP_SW `OP_LENGTH'h12
 `define OP_XOR `OP_LENGTH'h13
+`define OP_BLT `OP_LENGTH'h14
+`define OP_BGE `OP_LENGTH'h15
+`define OP_BLTU `OP_LENGTH'h16
+`define OP_BGEU `OP_LENGTH'h17
