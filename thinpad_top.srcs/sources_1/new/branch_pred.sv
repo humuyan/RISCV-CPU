@@ -38,6 +38,7 @@ always_comb begin
     // copied from decoder.sv
     jump_pc_reg = pc + 32'h4;
     pc_jumping = 0;
+    /*
     case (inst[6:0])
         7'b1100011: begin // B type
             jump_pc_reg = pc + {sign_ext, inst[7], inst[30:25], inst[11:8], 1'b0}; // pc + imm
@@ -57,13 +58,13 @@ always_comb begin
             jump_pc_reg = reg_s_val + {sign_ext, inst[31:20]};
             pc_jumping = 1;
         end
-        */
         default: begin end
     endcase
     // check if legal
     if (jump_pc_reg == 32'h10000000) begin
         jump_pc_reg = pc + 32'h4;
     end
+    */
 end
 
 always_ff @(posedge clk) begin
