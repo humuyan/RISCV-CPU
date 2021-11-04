@@ -377,7 +377,7 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                 // PC (in exe state)       
                 id_exe_pred_pc <= pred_pc;
                 exe_mem_pred_pc <= id_exe_pred_pc;
-                if (exe_mem_pred_pc != next_pc) begin
+                if (pc_jumping) begin
                     num_reg <= 8'h01;
                     pc <= next_pc; // pred failed, use next_pc and stop the pipeline
                     reg_inst <= INST_INVALID; 
