@@ -212,6 +212,7 @@ reg[31:0] pc, next_pc; // next pc is the real instruction after exe_mem_pc!
 reg[31:0] id_exe_pc, exe_mem_pc, mem_wb_pc;
 // pc in exe state
 reg is_jump_op, pc_jumping;
+/*
 always_comb begin
     pc_jumping = 1'b0;
     is_jump_op = 1'b0;
@@ -236,6 +237,35 @@ always_comb begin
             next_pc = exe_result;
         end
         default: next_pc = exe_mem_pc + 32'h4;
+    endcase
+end
+*/
+always_comb begin
+    pc_jumping = 1'b0;
+    is_jump_op = 1'b0;
+    case (exe_mem_op)
+        `OP_BEQ: begin
+            is_jump_op = 1'b1;
+            if (raw_exe_reg_s_val == raw_exe_reg_t_val) begin
+                pc_jumping = 1'b1;
+                next_pc = exe_result;
+            end
+            else next_pc = pc + 32'h4;
+        end
+        `OP_BNE: begin
+            is_jump_op = 1'b1;
+            if (raw_exe_reg_s_val != raw_exe_reg_t_val) begin
+                pc_jumping = 1'b1;
+                next_pc = exe_result;
+            end
+            else next_pc = pc + 32'h4;
+        end
+        `OP_JAL, `OP_JALR: begin
+            is_jump_op = 1'b1;
+            pc_jumping = 1'b1;
+            next_pc = exe_result;
+        end
+        default: next_pc = pc + 32'h4;
     endcase
 end
 
@@ -344,13 +374,14 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
     end else begin
         if (mem_done) begin
             if (mem_occupied_by == MEM_IF) begin          
-                // PC (in exe state)       
+                // PC (in exe state)    
+                pc <= next_pc; // pred failed, use next_pc and stop the pipeline   
                 id_exe_pred_pc <= pred_pc;
                 exe_mem_pred_pc <= id_exe_pred_pc;
                 
                 if (pc_jumping) begin
                     num_reg <= 8'h01;
-                    pc <= next_pc; // pred failed, use next_pc and stop the pipeline
+                    
                     reg_inst <= INST_INVALID; 
                     exe_mem_op <= `OP_INVALID;
                     id_exe_pc <= 0;
@@ -364,7 +395,7 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                     exe_imm_select <= 0;
                 end else begin
                     num_reg <= 8'h00;
-                    pc <= pred_pc; // pred success or sequential, use pred_pc is ok
+                    // pc <= pred_pc; // pred success or sequential, use pred_pc is ok
                     reg_inst <= mem_data_out;
                     exe_mem_op <= id_exe_op;
                     id_exe_pc <= pc;
