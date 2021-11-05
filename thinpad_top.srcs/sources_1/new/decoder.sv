@@ -1,11 +1,12 @@
 `default_nettype none
 `timescale 1ns / 1ps
 `include "ops.vh"
+`include "csr.vh"
 
 module decoder(
     input wire[31:0]        inst,
     output wire[4:0]        reg_s,
-    output wire[4:0]        reg_t,
+    output wire[4:0]        reg_t, // reg_t or csr reg
     output wire[4:0]        reg_d,
     output reg[5:0]         op,
     output reg[31:0]        imm,
@@ -18,7 +19,8 @@ module decoder(
     assign sign_ext = {20{sign}};
     assign reg_d = inst[11:7];
     assign reg_s = (inst[6:0] == 7'b0110111) ? 5'b00000 : inst[19:15]; // lui should have zero as s1
-    assign reg_t = inst[24:20];
+    assign reg_t = (inst[6:0] == 7'b1110011) ? csr_reg : inst[24:20]; // csr_reg will replace reg_t at CSR instructions
+    reg[4:0] csr_reg;
     
     always_comb begin
         op = `OP_INVALID;
@@ -104,7 +106,20 @@ module decoder(
                     default: begin end
                 endcase
             end
-            // TODO: jal jalr ecall ebreak
+            7'b1110011: begin
+                case (inst[31:20])
+                    12'b001100000101: csr_reg = `CSR_MTVEC;
+                    12'b001101000001: csr_reg = `CSR_MEPC;
+                    12'b001101000010: csr_reg = `CSR_MCAUSE;
+                    12'b001100000100: csr_reg = `CSR_MIE;
+                    12'b001101000100: csr_reg = `CSR_MIP;
+                    12'b001101000011: csr_reg = `CSR_MTVAL;
+                    12'b001101000000: csr_reg = `CSR_MSCRATCH;
+                    12'b001100000000: csr_reg = `CSR_MSTATUS;
+                    default: csr_reg = `CSR_ZERO;
+                endcase
+            end
+            // TODO: ecall ebreak
             default: begin end
         endcase
     end

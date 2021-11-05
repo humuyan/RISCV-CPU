@@ -1,0 +1,9 @@
+`define CSR_ZERO 5'h0
+`define CSR_MTVEC 5'h1
+`define CSR_MEPC 5'h2
+`define CSR_MCAUSE 5'h3
+`define CSR_MIE 5'h4
+`define CSR_MIP 5'h5
+`define CSR_MTVAL 5'h6
+`define CSR_MSCRATCH 5'h7
+`define CSR_MSTATUS 5'h8
