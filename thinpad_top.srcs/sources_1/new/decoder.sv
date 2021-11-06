@@ -52,7 +52,7 @@ module decoder(
                     default: begin end
                 endcase
             end
-            7'b0000011: begin 
+            7'b0000011: begin  // lb, lw (I type)
                 imm = {sign_ext, inst[31:20]};
                 imm_select = 1'b1;
                 case (inst[14:12])
@@ -96,7 +96,7 @@ module decoder(
                 imm_select = 1'b1;
                 op = `OP_JAL;
             end
-            7'b1100111: begin
+            7'b1100111: begin  // jalr (I type)
                 imm = {sign_ext, inst[31:20]};
                 imm_select = 1'b1;
                 case (inst[14:12]) 
@@ -104,7 +104,9 @@ module decoder(
                     default: begin end
                 endcase
             end
-            // TODO: jal jalr ecall ebreak
+            // TODO: ecall ebreak
+            // TODO: CLZ, SBCLR, PCNT
+            // if x == 0, CLZ(x) = -1
             default: begin end
         endcase
     end
