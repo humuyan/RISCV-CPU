@@ -199,11 +199,13 @@ wire[3:0] exe_flags;
 always_comb begin
     case (exe_mem_op)
         `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW: alu_op = `ADD;
-        `OP_AND, `OP_ANDI: alu_op = `AND;
+        `OP_AND, `OP_ANDI, `OP_SBCLR: alu_op = `AND;
         `OP_OR, `OP_ORI: alu_op = `OR;
         `OP_SLLI: alu_op = `SLL;
         `OP_SRLI: alu_op = `SRL;
         `OP_XOR: alu_op = `XOR;
+        `OP_CLZ: alu_op = `CLZ;
+        `OP_PCNT: alu_op = `PCNT;
         default: alu_op = `ZERO;
     endcase
 end
