@@ -39,8 +39,7 @@ module decoder(
             7'b0010011: begin // I type
                 imm = {sign_ext, inst[31:20]};
                 
-                if ({inst[31:25], inst[14:12]} == 10'b0110000_001) imm_select = 1'b0; // CLZ, PCNT
-                else imm_select = 1'b1;
+                imm_select = 1'b1;  // CLZ and PCNT do not need the operand b (imm)
 
                 case (inst[14:12])
                     3'b000: op = `OP_ADDI;
