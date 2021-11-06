@@ -18,8 +18,7 @@ module decoder(
     assign sign_ext = {20{sign}};
     assign reg_d = inst[11:7];
     assign reg_s = (inst[6:0] == 7'b0110111) ? 5'b00000 : inst[19:15]; // lui should have zero as s1
-    assign reg_t = ({inst[31:25], inst[14:12], inst[6:0]} == 17'b0100100_001_0110011) ? 
-        (~(1 << inst[24:20])) : inst[24:20];  // SBCLR : other cases
+    assign reg_t = inst[24:20]; 
     // CLZ and PCNT do not need s2 (reg_t).
     
     always_comb begin
@@ -51,7 +50,7 @@ module decoder(
                         if (inst[31:25] == 7'b0000000) op = `OP_SLLI;
                         else if (inst[31:25] == 7'b0110000) begin
                             if (inst[24:20] == 5'b00000) op = `OP_CLZ;
-                            else if(inst[24:20] == 5'b00001) op = `OP_PCNT;
+                            else if(inst[24:20] == 5'b00010) op = `OP_PCNT;
                             else begin end
                         end
                         else begin end

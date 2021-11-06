@@ -185,7 +185,7 @@ regfile _regfile(
 );
 
 reg[4:0] exe_reg_d;
-reg[`OP_LENGTH_1:0] exe_mem_op;
+reg[`OP_LENGTH_1:0] exe_mem_op; // exe_mem_op <= id_exe_op;
 reg[31:0] exe_imm;
 reg exe_imm_select;
 
@@ -199,13 +199,14 @@ wire[3:0] exe_flags;
 always_comb begin
     case (exe_mem_op)
         `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW: alu_op = `ADD;
-        `OP_AND, `OP_ANDI, `OP_SBCLR: alu_op = `AND;
+        `OP_AND, `OP_ANDI: alu_op = `AND;
         `OP_OR, `OP_ORI: alu_op = `OR;
         `OP_SLLI: alu_op = `SLL;
         `OP_SRLI: alu_op = `SRL;
         `OP_XOR: alu_op = `XOR;
         `OP_CLZ: alu_op = `CLZ;
         `OP_PCNT: alu_op = `PCNT;
+        `OP_SBCLR: alu_op = `SBCLR;
         default: alu_op = `ZERO;
     endcase
 end
@@ -357,7 +358,7 @@ alu _alu(
     .flags(exe_flags)
 );
 
-reg[`OP_LENGTH_1:0] mem_wb_op; // current id_exe_op in x state
+reg[`OP_LENGTH_1:0] mem_wb_op; // current id_exe_op in x state 
 // some reg info passed by ALU
 
 reg[4:0] exe_reg_s, exe_reg_t;
@@ -414,7 +415,7 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                 // EXE
                 mem_wb_pc <= exe_mem_pc;
                 mem_wb_op <= exe_mem_op;
-                case (exe_mem_op) // aka next mem_wb_op
+                case (exe_mem_op) // aka next mem_wb_op  (what is aka?)
                     `OP_LB, `OP_LW, `OP_SB, `OP_SW: mem_occupied_by <= MEM_MEM;
                     default: mem_occupied_by <= MEM_IF;
                 endcase

@@ -97,6 +97,9 @@ module alu(
                     result += a[idx];
                 end
             end
+            `SBCLR: begin
+                result = a & (~(1 << b));
+            end
             default: result = 0;
         endcase
         

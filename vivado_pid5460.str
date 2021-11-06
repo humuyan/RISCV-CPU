@@ -538,3 +538,157 @@ selectTree(PAResourceEtoH.FlowNavigatorTreePanel_FLOW_NAVIGATOR_TREE, "[, Synthe
 // Tcl Message: [Sat Nov  6 16:50:09 2021] Launched synth_1... Run output will be captured here: E:/coursefile/JuniorFirstSemester/cod21-grp82/thinpad_top.runs/synth_1/runme.log 
 dismissDialog("Starting Design Runs"); // bB (cr)
 // TclEventType: RUN_STATUS_CHANGE
+// TclEventType: RUN_COMPLETED
+// TclEventType: RUN_STATUS_CHANGE
+// TclEventType: RUN_STEP_COMPLETED
+// HMemoryUtils.trashcanNow. Engine heap size: 901 MB. GUI used memory: 56 MB. Current time: 11/6/21, 5:10:22 PM CST
+// HMemoryUtils.trashcanNow. Engine heap size: 901 MB. GUI used memory: 56 MB. Current time: 11/6/21, 5:40:22 PM CST
+// HMemoryUtils.trashcanNow. Engine heap size: 901 MB. GUI used memory: 56 MB. Current time: 11/6/21, 6:10:22 PM CST
+// HMemoryUtils.trashcanNow. Engine heap size: 901 MB. GUI used memory: 56 MB. Current time: 11/6/21, 6:40:23 PM CST
+// HMemoryUtils.trashcanNow. Engine heap size: 901 MB. GUI used memory: 55 MB. Current time: 11/6/21, 7:10:23 PM CST
+// HMemoryUtils.trashcanNow. Engine heap size: 901 MB. GUI used memory: 56 MB. Current time: 11/6/21, 7:40:23 PM CST
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// Elapsed time: 11571 seconds
+selectCodeEditor("thinpad_top.sv", 60, 195); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 84, 196, false, true, false, false, false); // ch (w, cr) - Control Key
+selectCodeEditor("thinpad_top.sv", 76, 234, false, true, false, false, false); // ch (w, cr) - Control Key
+selectCodeEditor("thinpad_top.sv", 249, 260, false, true, false, false, false); // ch (w, cr) - Control Key
+selectButton(PAResourceAtoD.AbstractFileView_RELOAD, "Reload"); // h (ds, cr)
+selectCodeEditor("thinpad_top.sv", 264, 180, false, true, false, false, false); // ch (w, cr) - Control Key
+selectCodeEditor("thinpad_top.sv", 262, 173, false, true, false, false, false); // ch (w, cr) - Control Key
+selectCodeEditor("thinpad_top.sv", 262, 173); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 349, 156); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 396, 146); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 422, 113); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 338, 144); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 303, 121); // ch (w, cr)
+// HMemoryUtils.trashcanNow. Engine heap size: 901 MB. GUI used memory: 56 MB. Current time: 11/6/21, 8:10:24 PM CST
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// Elapsed time: 1396 seconds
+selectButton(PAResourceAtoD.AbstractFileView_RELOAD, "Reload"); // h (ds, cr)
+selectTab("PlanAheadTabBaseWorkspace_JideTabbedPane", (HResource) null, "decoder.sv", 2); // i (h, cr)
+selectButton(PAResourceAtoD.AbstractFileView_RELOAD, "Reload"); // h (ds, cr)
+selectTab("PlanAheadTabBaseWorkspace_JideTabbedPane", (HResource) null, "alu.sv", 3); // i (h, cr)
+selectButton(PAResourceAtoD.AbstractFileView_RELOAD, "Reload"); // h (ds, cr)
+expandTree(PAResourceEtoH.FileSetPanel_FILE_SET_PANEL_TREE, "[root, Design Sources, Verilog Header]", 1); // B (F, cr)
+selectTree(PAResourceEtoH.FileSetPanel_FILE_SET_PANEL_TREE, "[root, Design Sources, Verilog Header, ops.vh]", 3, false); // B (F, cr)
+selectTree(PAResourceEtoH.FileSetPanel_FILE_SET_PANEL_TREE, "[root, Design Sources, Verilog Header, ops.vh]", 3, false, false, false, false, false, true); // B (F, cr) - Double Click
+selectTab("PlanAheadTabBaseWorkspace_JideTabbedPane", (HResource) null, "ops.vh", 4); // i (h, cr)
+closeView(PAResourceOtoP.PAViews_CODE, "Code"); // B
+selectTab("PlanAheadTabBaseWorkspace_JideTabbedPane", (HResource) null, "alu.sv", 3); // i (h, cr)
+closeView(PAResourceOtoP.PAViews_CODE, "Code"); // B
+selectTab("PlanAheadTabBaseWorkspace_JideTabbedPane", (HResource) null, "decoder.sv", 2); // i (h, cr)
+closeView(PAResourceOtoP.PAViews_CODE, "Code"); // B
+selectCodeEditor("thinpad_top.sv", 343, 114); // ch (w, cr)
+// TclEventType: DG_GRAPH_STALE
+// TclEventType: FILE_SET_CHANGE
+// Elapsed time: 17 seconds
+selectCodeEditor("thinpad_top.sv", 504, 98); // ch (w, cr)
+selectButton(PAResourceAtoD.AbstractFileView_RELOAD, "Reload"); // h (ds, cr)
+selectTree(PAResourceEtoH.FileSetPanel_FILE_SET_PANEL_TREE, "[root, Design Sources, thinpad_top (thinpad_top.sv), _decoder : decoder (decoder.sv)]", 9, false); // B (F, cr)
+selectTree(PAResourceEtoH.FileSetPanel_FILE_SET_PANEL_TREE, "[root, Design Sources, thinpad_top (thinpad_top.sv), _decoder : decoder (decoder.sv)]", 9, false, false, false, false, false, true); // B (F, cr) - Double Click
+selectTab("PlanAheadTabBaseWorkspace_JideTabbedPane", (HResource) null, "decoder.sv", 2); // i (h, cr)
+closeView(PAResourceOtoP.PAViews_CODE, "Code"); // B
+selectTree(PAResourceEtoH.FileSetPanel_FILE_SET_PANEL_TREE, "[root, Design Sources, thinpad_top (thinpad_top.sv), _alu : alu (alu.sv)]", 12, false); // B (F, cr)
+selectTree(PAResourceEtoH.FileSetPanel_FILE_SET_PANEL_TREE, "[root, Design Sources, thinpad_top (thinpad_top.sv), _alu : alu (alu.sv)]", 12, false, false, false, false, false, true); // B (F, cr) - Double Click
+selectTab("PlanAheadTabBaseWorkspace_JideTabbedPane", (HResource) null, "alu.sv", 2); // i (h, cr)
+closeView(PAResourceOtoP.PAViews_CODE, "Code"); // B
+// Elapsed time: 10 seconds
+selectCodeEditor("thinpad_top.sv", 124, 127); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 124, 127, false, false, false, false, true); // ch (w, cr) - Double Click
+selectCodeEditor("thinpad_top.sv", 104, 98); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 104, 98, false, false, false, false, true); // ch (w, cr) - Double Click
+selectCodeEditor("thinpad_top.sv", 104, 86); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 104, 86, false, false, false, false, true); // ch (w, cr) - Double Click
+selectCodeEditor("thinpad_top.sv", 104, 67); // ch (w, cr)
+selectCodeEditor("thinpad_top.sv", 104, 67, false, false, false, false, true); // ch (w, cr) - Double Click
+selectCodeEditor("thinpad_top.sv", 182, 148); // ch (w, cr)
+selectTree(PAResourceEtoH.FlowNavigatorTreePanel_FLOW_NAVIGATOR_TREE, "[, Synthesis, Run Synthesis]", 14, false); // u (O, cr)
+// Run Command: PAResourceCommand.PACommandNames_RUN_SYNTHESIS
+// bB (cr):  Resetting Runs : addNotify
+// TclEventType: RUN_MODIFY
+// TclEventType: RUN_RESET
+// TclEventType: RUN_STATUS_CHANGE
+// TclEventType: RUN_RESET
+// TclEventType: RUN_MODIFY
+// Tcl Message: reset_run synth_1 
+// bB (cr):  Starting Design Runs : addNotify
+// TclEventType: FILESET_TARGET_UCF_CHANGE
+// TclEventType: RUN_LAUNCH
+// TclEventType: RUN_MODIFY
+// Tcl Message: launch_runs synth_1 -jobs 8 
+// Tcl Message: [Sat Nov  6 20:27:26 2021] Launched synth_1... Run output will be captured here: E:/coursefile/JuniorFirstSemester/cod21-grp82/thinpad_top.runs/synth_1/runme.log 
+dismissDialog("Starting Design Runs"); // bB (cr)
+// TclEventType: RUN_STATUS_CHANGE
