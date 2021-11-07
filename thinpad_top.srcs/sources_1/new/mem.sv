@@ -3,7 +3,7 @@
 `include "mem.vh"
 
 module mem (
-    input wire[3:0] inst,
+    input wire[4:0] inst,
     input wire[31:0] addr,
     input wire[31:0] data_in,
     input wire clk,
@@ -91,6 +91,14 @@ assign base_byte_data = addr[1:0] == 2'b00 ? base_ram_data[7:0] :
                         (addr[1:0] == 2'b01 ? base_ram_data[15:8] :
                         (addr[1:0] == 2'b10 ? base_ram_data[23:16] : base_ram_data[31:24]));
 
+wire base_half_sign;
+assign base_half_sign = addr[1:0] == 2'b00 ? base_ram_data[15] : 
+                        (addr[1:0] == 2'b01 ? base_ram_data[23] : base_ram_data[31]);
+
+wire[7:0] base_half_data;
+assign base_half_data = addr[1:0] == 2'b00 ? base_ram_data[15:0] : 
+                        (addr[1:0] == 2'b01 ? base_ram_data[23:8] : base_ram_data[31:16]);
+
 
 wire ext_byte_sign;
 assign ext_byte_sign = addr[1:0] == 2'b00 ? ext_ram_data[7] : 
@@ -102,6 +110,14 @@ assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] :
                        (addr[1:0] == 2'b01 ? ext_ram_data[15:8] :
                        (addr[1:0] == 2'b10 ? ext_ram_data[23:16] : ext_ram_data[31:24]));
 
+wire ext_half_sign;
+assign ext_half_sign = addr[1:0] == 2'b00 ? ext_ram_data[15] : 
+                       (addr[1:0] == 2'b01 ? ext_ram_data[23] : ext_ram_data[31]);
+
+wire[7:0] ext_half_data;
+assign ext_half_data = addr[1:0] == 2'b00 ? ext_ram_data[15:0] : 
+                       (addr[1:0] == 2'b01 ? ext_ram_data[23:8] : ext_ram_data[31:16]);
+
 
 always_comb begin
     cur_data_out = 32'b0;
@@ -109,14 +125,16 @@ always_comb begin
         `MEM_READ: casez (addr)
             `MEM_BASE: begin
                 case (inst[1:0])
-                    `MEM_BYTE: cur_data_out = {{24{base_byte_sign}}, base_byte_data};
+                    `MEM_BYTE: cur_data_out = {{24{inst[4] == `SIGN_EXT ? base_byte_sign : 0}}, base_byte_data};
+                    `MEM_HALF: cur_data_out = {{16{inst[4] == `SIGN_EXT ? base_half_sign : 0}}, base_half_data};
                     `MEM_WORD: cur_data_out = base_ram_data;
                     default: begin end
                 endcase 
             end
             `MEM_EXT: begin
                 case (inst[1:0])
-                    `MEM_BYTE: cur_data_out = {{24{ext_byte_sign}}, ext_byte_data};
+                    `MEM_BYTE: cur_data_out = {{24{inst[4] == `SIGN_EXT ? ext_byte_sign : 0}}, ext_byte_data};
+                    `MEM_HALF: cur_data_out = {{16{inst[4] == `SIGN_EXT ? ext_half_sign : 0}}, ext_half_data};
                     `MEM_WORD: cur_data_out = ext_ram_data;
                     default: begin end
                 endcase
@@ -194,6 +212,23 @@ always_comb begin
                                         cur_data_in = {cur_data_in[7:0], 24'b0};  
                                     end
                                 endcase         
+                            end
+                            `MEM_HALF: begin
+                                case (addr[1:0])
+                                    2'b00: begin
+                                        ram_be_n = 4'b1100;
+                                        cur_data_in = {16'b0, data_in[15:0]};
+                                    end
+                                    2'b01: begin
+                                        ram_be_n = 4'b1001;
+                                        cur_data_in = {8'b0, data_in[15:0], 8'b0};
+                                    end
+                                    2'b10: begin
+                                        ram_be_n = 4'b0011;
+                                        cur_data_in = {data_in[15:0], 16'b0};
+                                    end
+                                    default: begin end // data must be assigned
+                                endcase
                             end
                             default: begin end
                         endcase

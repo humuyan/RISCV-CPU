@@ -198,7 +198,7 @@ wire[3:0] exe_flags;
 // alu
 always_comb begin
     case (exe_mem_op)
-        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW: alu_op = `ADD;
+        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU: alu_op = `ADD;
         `OP_AND, `OP_ANDI: alu_op = `AND;
         `OP_OR, `OP_ORI: alu_op = `OR;
         `OP_SLLI: alu_op = `SLL;
@@ -294,20 +294,24 @@ always_comb begin
     mem_inst = `MEM_IDLE_IDLE;
     if (mem_occupied_by == MEM_MEM) begin
         case (mem_wb_op)
-            `OP_LB, `OP_LW: begin
+            `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU: begin
                 mem_data_in = 32'b0;
                 mem_addr = mem_exe_result;
                 case (mem_wb_op)
                     `OP_LB: mem_inst = `MEM_READ_BYTE;
+                    `OP_LBU: mem_inst = `MEM_READ_BYTE_UNSIGNED;
+                    `OP_LH: mem_inst = `MEM_READ_HALF;
+                    `OP_LHU: mem_inst = `MEM_READ_HALF_UNSIGNED;
                     `OP_LW: mem_inst = `MEM_READ_WORD;
                     default: begin end
                 endcase
             end
-            `OP_SB, `OP_SW: begin
+            `OP_SB, `OP_SW, `OP_SH: begin
                 mem_data_in = (wb_reg_d == mem_reg_t && wb_reg_d != 5'b0) ? wb_exe_result : mem_exe_reg_t_val;
                 mem_addr = mem_exe_result;
                 case (mem_wb_op)
                     `OP_SB: mem_inst = `MEM_WRITE_BYTE;
+                    `OP_SH: mem_inst = `MEM_WRITE_HALF;
                     `OP_SW: mem_inst = `MEM_WRITE_WORD;
                     default: begin end
                 endcase

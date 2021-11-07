@@ -54,12 +54,15 @@ module decoder(
                     default: begin end
                 endcase
             end
-            7'b0000011: begin 
+            7'b0000011: begin  // lb, lh, lw, lbu, lhu (I type)
                 imm = {sign_ext, inst[31:20]};
                 imm_select = 1'b1;
                 case (inst[14:12])
                     3'b000: op = `OP_LB;
+                    3'b001: op = `OP_LH;
                     3'b010: op = `OP_LW;
+                    3'b100: op = `OP_LBU;
+                    3'b101: op = `OP_LHU;
                     default: begin end
                 endcase
             end // I type (load)
@@ -68,6 +71,7 @@ module decoder(
                 imm_select = 1'b1;
                 case (inst[14:12])
                     3'b000: op = `OP_SB;
+                    3'b001: op = `OP_SH;
                     3'b010: op = `OP_SW;
                     default: begin end
                 endcase
