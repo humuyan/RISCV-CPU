@@ -94,7 +94,7 @@ assign base_byte_data = addr[1:0] == 2'b00 ? base_ram_data[7:0] :
 wire base_half_sign;
 assign base_half_sign = addr[1:0] == 2'b00 ? base_ram_data[15] : base_ram_data[31];
 
-wire[7:0] base_half_data;
+wire[15:0] base_half_data;
 assign base_half_data = addr[1:0] == 2'b00 ? base_ram_data[15:0] : base_ram_data[31:16];
 
 
@@ -111,7 +111,7 @@ assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] :
 wire ext_half_sign;
 assign ext_half_sign = addr[1:0] == 2'b00 ? ext_ram_data[15] : ext_ram_data[31];
 
-wire[7:0] ext_half_data;
+wire[15:0] ext_half_data;
 assign ext_half_data = addr[1:0] == 2'b00 ? ext_ram_data[15:0] : ext_ram_data[31:16];
 
 
