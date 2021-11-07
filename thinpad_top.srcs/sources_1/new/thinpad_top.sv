@@ -417,7 +417,7 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                 mem_wb_pc <= exe_mem_pc;
                 mem_wb_op <= exe_mem_op;
                 case (exe_mem_op) // aka next mem_wb_op
-                    `OP_LB, `OP_LW, `OP_SB, `OP_SW, `OP_LU, `OP_LBU, `OP_LHU, `OP_SH: mem_occupied_by <= MEM_MEM;
+                    `OP_LB, `OP_LW, `OP_SB, `OP_SW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SH: mem_occupied_by <= MEM_MEM;
                     default: mem_occupied_by <= MEM_IF;
                 endcase
                 mem_exe_reg_s_val <= exe_reg_s_val;

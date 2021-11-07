@@ -18,7 +18,6 @@
 `define MEM_MTIMECMP_LO 32'h2004000
 `define MEM_MTIMECMP_HI 32'h2004004
 
-// first bit: 0 means signed extension, 1 means zero extension
 `define MEM_IDLE_IDLE {0, `MEM_IDLE, `MEM_IDLE}
 `define MEM_READ_BYTE {`SIGN_EXT, `MEM_READ, `MEM_BYTE}
 `define MEM_READ_BYTE_UNSIGNED {`ZERO_EXT, `MEM_READ, `MEM_BYTE}

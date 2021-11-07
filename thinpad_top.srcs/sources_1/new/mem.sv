@@ -160,6 +160,7 @@ end
 assign done = next_state == S_RW_RAM ? 1'b1 : 1'b0;
 assign idle = (state == S_IDLE) ? 1'b1 : 1'b0;
 
+reg[3:0] done_be_n;
 // Try to accelerate R&W of memory to 1 cycle.
 reg[3:0] next_state;
 // This logic is only for idle / read_ram / write_ram
@@ -285,6 +286,7 @@ always_comb begin
             next_state = S_DONE;
         end
         S_DONE: begin
+            ram_be_n = done_be_n;
             ram_enable = done_ram_enable;
             next_state = S_RW_RAM;
         end
@@ -297,7 +299,10 @@ always_ff @(posedge clk or posedge rst) begin
         state <= S_IDLE;
     end else begin
         state <= next_state;
-        if (next_state == S_DONE) done_ram_enable <= ram_enable;
+        if (next_state == S_DONE) begin
+            done_ram_enable <= ram_enable;
+            done_be_n <= ram_be_n;
+        end
         else done_ram_enable <= IDLE;
         if (inst[3:2] == `MEM_WRITE) begin
             casez (addr)
