@@ -11,6 +11,7 @@ module mem (
     input wire rst,
     
     output reg[3:0] cur_exception,
+    output wire mtip,
     output wire done,
     output wire idle,
     output wire[31:0] data_out,
@@ -116,9 +117,9 @@ assign ext_half_sign = addr[1:0] == 2'b00 ? ext_ram_data[15] : ext_ram_data[31];
 wire[15:0] ext_half_data;
 assign ext_half_data = addr[1:0] == 2'b00 ? ext_ram_data[15:0] : ext_ram_data[31:16];
 
+assign mtip = mtime >= mtimecmp;
 always_comb begin
-    if (mtime >= mtimecmp) cur_exception = `EXCEPT_TIMEOUT;
-    else cur_exception = `EXCEPT_NONE;
+    cur_exception = `EXCEPT_NONE;
 end
 
 always_comb begin
@@ -295,6 +296,8 @@ end
 always_ff @(posedge clk or posedge rst) begin
     if (rst) begin
         state <= S_IDLE;
+        mtime <= 64'h0;
+        mtimecmp <= 64'hFFFFFFFF;
     end else begin
         state <= next_state;
         if (next_state == S_DONE) begin

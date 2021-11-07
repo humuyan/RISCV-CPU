@@ -6,10 +6,12 @@ module exception_handler(
     input wire          clk,
     input wire          rst,
     input wire          mem_done,
+    input wire[1:0]     mem_occupied_by,
     input wire          we,
     input wire[4:0]     waddr,
     input wire[31:0]    wdata,
     input wire[4:0]     raddr,
+    input wire          mtip,
     input wire[3:0]     cur_exception,
     input wire[31:0]    cur_exception_pc,
 
@@ -18,6 +20,8 @@ module exception_handler(
     output wire[31:0]   rdata,
     output wire         is_exception
     );
+
+    localparam MEM_IF = 1;
 
     `define STATUS_MPP csrs[`CSR_MSTATUS][12:11]
     `define STATUS_MIE csrs[`CSR_MSTATUS][3]
@@ -97,47 +101,39 @@ module exception_handler(
             csrs[30] <= 32'h00000000;
             csrs[31] <= 32'h00000000;
         end else begin
-            if (mem_done) begin // trigger current exception
-                if (is_exception) begin
-                    case (cur_exception)
-                        `EXCEPT_U_ECALL: begin
+            if (mem_done && is_exception) begin
+                case (cur_exception)
+                    `EXCEPT_U_ECALL: begin
+                        csrs[`CSR_MEPC] <= cur_exception_pc;
+                        csrs[`CSR_MCAUSE] <= CAUSE_U_ECALL;
+                        `STATUS_MPP <= mode;
+                        mode <= MACHINE;
+                    end
+                    `EXCEPT_EBREAK: begin
+                        csrs[`CSR_MEPC] <= cur_exception_pc;
+                        csrs[`CSR_MCAUSE] <= CAUSE_EBREAK;
+                        `STATUS_MPP <= mode;
+                        mode <= MACHINE;
+                    end
+                    `EXCEPT_MRET: begin
+                        `STATUS_MPP <= 2'b00;
+                        mode <= mode_t'(`STATUS_MPP);
+                    end
+                    default: begin 
+                        if ((`STATUS_MIE || mode < MACHINE) && 
+                            `MIE[IDX_TIMEOUT] && `MIP[IDX_TIMEOUT]) begin // timeout
                             csrs[`CSR_MEPC] <= cur_exception_pc;
-                            csrs[`CSR_MCAUSE] <= CAUSE_U_ECALL;
+                            csrs[`CSR_MCAUSE] <= CAUSE_TIMEOUT;
                             `STATUS_MPP <= mode;
                             mode <= MACHINE;
                         end
-                        `EXCEPT_EBREAK: begin
-                            csrs[`CSR_MEPC] <= cur_exception_pc;
-                            csrs[`CSR_MCAUSE] <= CAUSE_EBREAK;
-                            `STATUS_MPP <= mode;
-                            mode <= MACHINE;
-                        end
-                        `EXCEPT_MRET: begin
-                            `STATUS_MPP <= 2'b00;
-                            mode <= `STATUS_MPP;
-                        end
-                        default: begin 
-                            if ((`STATUS_MIE || mode < MACHINE) && 
-                                `MIE[IDX_TIMEOUT] && `MIP[IDX_TIMEOUT]) begin // timeout
-                                `MIP[IDX_TIMEOUT] <= 1'b0; // ?????
-                                csrs[`CSR_MEPC] <= cur_exception_pc;
-                                csrs[`CSR_MCAUSE] <= CAUSE_TIMEOUT;
-                                `STATUS_MPP <= mode;
-                                mode <= MACHINE;
-                            end
-                        end
-                    endcase
-                end
+                    end
+                endcase
             // for accurate interrupt, I won't optimize the ram again.
             end else begin // handle other commands (csrrs etc.)
-                if (mode == MACHINE) csrs[waddr] <= wdata;
+                if (mem_done && mem_occupied_by == MEM_IF && we && mode == MACHINE) csrs[waddr] <= wdata;
                 // set MIP
-                case (cur_exception)
-                    `EXCEPT_TIMEOUT: begin
-                        if (`MIE[IDX_TIMEOUT]) `MIP[IDX_TIMEOUT] <= 1'b1;
-                    end
-                    default: begin end
-                endcase
+                `MIP[IDX_TIMEOUT] <= mtip;
             end
         end
     end

@@ -147,6 +147,7 @@ mem _mem(
     .uart_dataready(uart_dataready),
     .uart_tbre(uart_tbre),
     .uart_tsre(uart_tsre),
+    .mtip(mtip),
     .cur_exception(mem_exception)
 );
 
@@ -355,15 +356,19 @@ wire[31:0] raw_exe_reg_s_val, raw_exe_reg_t_val;
 assign raw_exe_reg_s_val = ((mem_reg_d == exe_reg_s && mem_reg_d != 5'b0) ? mem_exe_result : exe_reg_s_val);
 assign raw_exe_reg_t_val = ((mem_reg_d == exe_reg_t && mem_reg_d != 5'b0) ? mem_exe_result : exe_reg_t_val);
 
+wire exe_is_csr_op;
+assign exe_is_csr_op = (exe_mem_op == `OP_CSRRC || exe_mem_op == `OP_CSRRS || exe_mem_op == `OP_CSRRW);
 alu _alu(
     .op(alu_op),
-    .a((exe_mem_op == `OP_BEQ || exe_mem_op == `OP_BNE || exe_mem_op == `OP_AUIPC || exe_mem_op == `OP_JAL) ? exe_mem_pc : raw_exe_reg_s_val),
-    .b(exe_imm_select ? exe_imm : (is_csr_op ? 32'h0 : raw_exe_reg_t_val)),
+    .a((exe_mem_op == `OP_BEQ || exe_mem_op == `OP_BNE || exe_mem_op == `OP_AUIPC || exe_mem_op == `OP_JAL) ? exe_mem_pc : 
+       (exe_is_csr_op ? 32'b0 : raw_exe_reg_s_val)), // csr op needs all zero to get csr value
+    .b(exe_imm_select ? exe_imm : 
+       (exe_is_csr_op && csr_waddr == exe_reg_t && csr_waddr != 5'b0 ? csr_wdata : raw_exe_reg_t_val)), // csr is moved to EXE so I need to handle data dependency
     .r(exe_result),
     .flags(exe_flags)
 );
 
-typedef enum reg[2:0] { EXCEPT_NO_PLACE, EXCEPT_ID, EXCEPT_MEM } except_place_t;
+typedef enum reg[2:0] { EXCEPT_NO_PLACE, EXCEPT_IF, EXCEPT_ID, EXCEPT_MEM } except_place_t;
 reg[3:0] id_exception, mem_exception;
 reg[3:0] cur_exception;
 reg[31:0] cur_exception_pc;
@@ -378,33 +383,38 @@ always_comb begin
         cur_except_place = EXCEPT_ID;
         cur_exception = id_exception;
         cur_exception_pc = id_exe_pc;
-    end else begin
-        cur_except_place = EXCEPT_NO_PLACE;
+    end else begin // timeout
+        cur_except_place = EXCEPT_IF;
         cur_exception = `EXCEPT_NONE;
-        cur_exception_pc = 32'h0;
+        cur_exception_pc = pc;
     end
 end
 
 wire[31:0] mtvec, mepc, csr_val;
-wire is_exception;
+wire is_exception, mtip;
 reg csr_we;
 reg[4:0] csr_waddr;
 reg[31:0] csr_wdata;
+
 always_comb begin
-    case (id_exe_op)
+    case (exe_mem_op)
         `OP_CSRRC: begin
-            csr_waddr = reg_t;
-            csr_wdata = csr_val & (~reg_rdata1);
+            csr_we = 1'h1;
+            csr_waddr = exe_reg_t;
+            csr_wdata = csr_val & raw_exe_reg_s_val;
         end
         `OP_CSRRS: begin
-            csr_waddr = reg_t;
-            csr_wdata = csr_val | reg_rdata1;
+            csr_we = 1'h1;
+            csr_waddr = exe_reg_t;
+            csr_wdata = csr_val | raw_exe_reg_s_val;
         end
         `OP_CSRRW: begin
-            csr_waddr = reg_t;
-            csr_wdata = reg_rdata1;
+            csr_we = 1'h1;
+            csr_waddr = exe_reg_t;
+            csr_wdata = raw_exe_reg_s_val;
         end
         default: begin
+            csr_we = 1'h0;
             csr_waddr = 5'h0;
             csr_wdata = 32'h0;
         end
@@ -414,21 +424,24 @@ exception_handler _exception_handler(
     .clk(clk_50M),
     .rst(reset_btn),
     .mem_done(mem_done),
+    .mem_occupied_by(mem_occupied_by),
     .we(csr_we),
     .waddr(csr_waddr),
     .wdata(csr_wdata),
-    .raddr(reg_t),
+    .raddr(exe_reg_t),
     .cur_exception(cur_exception),
     .cur_exception_pc(cur_exception_pc),
     .mtvec(mtvec),
     .mepc(mepc),
     .rdata(csr_val),
+    .mtip(mtip),
     .is_exception(is_exception)
 );
 
-reg[31:0] id_reg_s_val, id_reg_t_val;
 wire is_csr_op;
 assign is_csr_op = (id_exe_op == `OP_CSRRC || id_exe_op == `OP_CSRRS || id_exe_op == `OP_CSRRW);
+
+reg[31:0] id_reg_s_val, id_reg_t_val;
 always_comb begin
     id_reg_s_val = reg_rdata1;
     id_reg_t_val = is_csr_op ? csr_val : reg_rdata2;
