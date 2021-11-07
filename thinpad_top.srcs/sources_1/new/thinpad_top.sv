@@ -185,7 +185,7 @@ regfile _regfile(
 );
 
 reg[4:0] exe_reg_d;
-reg[`OP_LENGTH_1:0] exe_mem_op;
+reg[`OP_LENGTH_1:0] exe_mem_op; // exe_mem_op <= id_exe_op;
 reg[31:0] exe_imm;
 reg exe_imm_select;
 
@@ -204,6 +204,9 @@ always_comb begin
         `OP_SLLI: alu_op = `SLL;
         `OP_SRLI: alu_op = `SRL;
         `OP_XOR: alu_op = `XOR;
+        `OP_CLZ: alu_op = `CLZ;
+        `OP_PCNT: alu_op = `PCNT;
+        `OP_SBCLR: alu_op = `SBCLR;
         default: alu_op = `ZERO;
     endcase
 end
@@ -325,7 +328,7 @@ end
 // wb
 always_comb begin
     case (mem_wb_op)
-        `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW: begin
+        `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_CLZ, `OP_PCNT, `OP_SBCLR: begin
             reg_waddr = mem_reg_d;
             reg_wdata = mem_exe_result;
             reg_we = 1'b1;
@@ -355,7 +358,7 @@ alu _alu(
     .flags(exe_flags)
 );
 
-reg[`OP_LENGTH_1:0] mem_wb_op; // current id_exe_op in x state
+reg[`OP_LENGTH_1:0] mem_wb_op; // current id_exe_op in x state 
 // some reg info passed by ALU
 
 reg[4:0] exe_reg_s, exe_reg_t;
@@ -412,7 +415,7 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                 // EXE
                 mem_wb_pc <= exe_mem_pc;
                 mem_wb_op <= exe_mem_op;
-                case (exe_mem_op) // aka next mem_wb_op
+                case (exe_mem_op) // aka next mem_wb_op  (what is aka?)
                     `OP_LB, `OP_LW, `OP_SB, `OP_SW: mem_occupied_by <= MEM_MEM;
                     default: mem_occupied_by <= MEM_IF;
                 endcase

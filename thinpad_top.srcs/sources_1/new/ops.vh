@@ -24,3 +24,7 @@
 `define OP_BGE `OP_LENGTH'h15
 `define OP_BLTU `OP_LENGTH'h16
 `define OP_BGEU `OP_LENGTH'h17
+
+`define OP_CLZ `OP_LENGTH'h18
+`define OP_SBCLR `OP_LENGTH'h19
+`define OP_PCNT `OP_LENGTH'h20

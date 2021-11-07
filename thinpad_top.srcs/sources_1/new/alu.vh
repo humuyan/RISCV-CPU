@@ -9,3 +9,6 @@
 `define SRL     4'b1000
 `define SRA     4'b1001
 `define ROL     4'b1010
+`define CLZ     4'b1011
+`define PCNT    4'b1100
+`define SBCLR   4'b1101
