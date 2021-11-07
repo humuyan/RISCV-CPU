@@ -198,7 +198,7 @@ wire[3:0] exe_flags;
 // alu
 always_comb begin
     case (exe_mem_op)
-        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU: alu_op = `ADD;
+        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SH: alu_op = `ADD;
         `OP_AND, `OP_ANDI: alu_op = `AND;
         `OP_OR, `OP_ORI: alu_op = `OR;
         `OP_SLLI: alu_op = `SLL;
@@ -417,7 +417,7 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                 mem_wb_pc <= exe_mem_pc;
                 mem_wb_op <= exe_mem_op;
                 case (exe_mem_op) // aka next mem_wb_op
-                    `OP_LB, `OP_LW, `OP_SB, `OP_SW: mem_occupied_by <= MEM_MEM;
+                    `OP_LB, `OP_LW, `OP_SB, `OP_SW, `OP_LU, `OP_LBU, `OP_LHU, `OP_SH: mem_occupied_by <= MEM_MEM;
                     default: mem_occupied_by <= MEM_IF;
                 endcase
                 mem_exe_reg_s_val <= exe_reg_s_val;
