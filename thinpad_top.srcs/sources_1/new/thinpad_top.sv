@@ -103,7 +103,7 @@ assign number = num_reg;
 assign leds = pc[15:0];
 
 // interface to memory
-reg[3:0] mem_inst;
+reg[4:0] mem_inst;
 reg[31:0] mem_addr;
 reg[31:0] mem_data_in;
 wire[31:0] mem_data_out;
