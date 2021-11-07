@@ -26,6 +26,7 @@ module decoder(
         op = `OP_INVALID;
         imm = 32'h0;
         imm_select = 1'b0;
+        csr_reg = `CSR_ZERO;
         case (inst[6:0])
             7'b0110011: begin // R type
                 case ({inst[31:25], inst[14:12]}) // funct7 and funct3
