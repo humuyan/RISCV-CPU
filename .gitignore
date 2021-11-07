@@ -7,3 +7,5 @@ thinpad_top.runs/
 /.lint/
 /.Xil
 /.Xilinx
+thinpad_top.sim/
+thinpad_top.srcs/sim_1/new/tb.sv

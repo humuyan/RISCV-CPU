@@ -4,7 +4,7 @@
 `include "csr.vh"
 
 module mem (
-    input wire[3:0] inst,
+    input wire[4:0] inst,
     input wire[31:0] addr,
     input wire[31:0] data_in,
     input wire clk,
@@ -93,6 +93,12 @@ assign base_byte_data = addr[1:0] == 2'b00 ? base_ram_data[7:0] :
                         (addr[1:0] == 2'b01 ? base_ram_data[15:8] :
                         (addr[1:0] == 2'b10 ? base_ram_data[23:16] : base_ram_data[31:24]));
 
+wire base_half_sign;
+assign base_half_sign = addr[1:0] == 2'b00 ? base_ram_data[15] : base_ram_data[31];
+
+wire[15:0] base_half_data;
+assign base_half_data = addr[1:0] == 2'b00 ? base_ram_data[15:0] : base_ram_data[31:16];
+
 
 wire ext_byte_sign;
 assign ext_byte_sign = addr[1:0] == 2'b00 ? ext_ram_data[7] : 
@@ -103,6 +109,12 @@ wire[7:0] ext_byte_data;
 assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] : 
                        (addr[1:0] == 2'b01 ? ext_ram_data[15:8] :
                        (addr[1:0] == 2'b10 ? ext_ram_data[23:16] : ext_ram_data[31:24]));
+
+wire ext_half_sign;
+assign ext_half_sign = addr[1:0] == 2'b00 ? ext_ram_data[15] : ext_ram_data[31];
+
+wire[15:0] ext_half_data;
+assign ext_half_data = addr[1:0] == 2'b00 ? ext_ram_data[15:0] : ext_ram_data[31:16];
 
 always_comb begin
     if (mtime >= mtimecmp) cur_exception = `EXCEPT_TIMEOUT;
@@ -115,14 +127,16 @@ always_comb begin
         `MEM_READ: casez (addr)
             `MEM_BASE: begin
                 case (inst[1:0])
-                    `MEM_BYTE: cur_data_out = {{24{base_byte_sign}}, base_byte_data};
+                    `MEM_BYTE: cur_data_out = {{24{inst[4] == `SIGN_EXT ? base_byte_sign : 1'b0}}, base_byte_data};
+                    `MEM_HALF: cur_data_out = {{16{inst[4] == `SIGN_EXT ? base_half_sign : 1'b0}}, base_half_data};
                     `MEM_WORD: cur_data_out = base_ram_data;
                     default: begin end
                 endcase 
             end
             `MEM_EXT: begin
                 case (inst[1:0])
-                    `MEM_BYTE: cur_data_out = {{24{ext_byte_sign}}, ext_byte_data};
+                    `MEM_BYTE: cur_data_out = {{24{inst[4] == `SIGN_EXT ? ext_byte_sign : 1'b0}}, ext_byte_data};
+                    `MEM_HALF: cur_data_out = {{16{inst[4] == `SIGN_EXT ? ext_half_sign : 1'b0}}, ext_half_data};
                     `MEM_WORD: cur_data_out = ext_ram_data;
                     default: begin end
                 endcase
@@ -148,6 +162,7 @@ end
 assign done = next_state == S_RW_RAM ? 1'b1 : 1'b0;
 assign idle = (state == S_IDLE) ? 1'b1 : 1'b0;
 
+reg[3:0] done_be_n;
 // Try to accelerate R&W of memory to 1 cycle.
 reg[3:0] next_state;
 // This logic is only for idle / read_ram / write_ram
@@ -200,6 +215,19 @@ always_comb begin
                                         cur_data_in = {cur_data_in[7:0], 24'b0};  
                                     end
                                 endcase         
+                            end
+                            `MEM_HALF: begin
+                                case (addr[1:0])
+                                    2'b00: begin
+                                        ram_be_n = 4'b1100;
+                                        cur_data_in = {16'b0, data_in[15:0]};
+                                    end
+                                    2'b10: begin
+                                        ram_be_n = 4'b0011;
+                                        cur_data_in = {data_in[15:0], 16'b0};
+                                    end
+                                    default: begin end // data must be assigned
+                                endcase
                             end
                             default: begin end
                         endcase
@@ -256,6 +284,7 @@ always_comb begin
             next_state = S_DONE;
         end
         S_DONE: begin
+            ram_be_n = done_be_n;
             ram_enable = done_ram_enable;
             next_state = S_RW_RAM;
         end
@@ -268,7 +297,10 @@ always_ff @(posedge clk or posedge rst) begin
         state <= S_IDLE;
     end else begin
         state <= next_state;
-        if (next_state == S_DONE) done_ram_enable <= ram_enable;
+        if (next_state == S_DONE) begin
+            done_ram_enable <= ram_enable;
+            done_be_n <= ram_be_n;
+        end
         else done_ram_enable <= IDLE;
         if (inst[3:2] == `MEM_WRITE) begin
             casez (addr)
