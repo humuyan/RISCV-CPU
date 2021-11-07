@@ -120,7 +120,7 @@ mem _mem(
     .inst(mem_inst),
     .addr(mem_addr),
     .data_in(mem_data_in),
-    .clk(clk_11M0592),
+    .clk(clk_50M),
     .rst(reset_btn),
     .done(mem_done),
     .idle(mem_idle),
@@ -171,7 +171,7 @@ wire[31:0] reg_rdata1;
 wire[31:0] reg_rdata2;
 
 regfile _regfile(
-    .clk(clk_11M0592),
+    .clk(clk_50M),
     .rst(reset_btn),
     .we(reg_we),
     .waddr(reg_waddr),
@@ -279,7 +279,7 @@ reg[31:0] pred_pc;
 reg[31:0] id_exe_pred_pc, exe_mem_pred_pc;
 // pred pc
 branch_pred _branch_pred(
-    .clk(clk_11M0592),
+    .clk(clk_50M),
     .is_jump_op(is_jump_op),
     .last_jump_pc(exe_mem_pc[4:2]),
     .last_jump_result(pc_jumping),
@@ -328,7 +328,7 @@ end
 // wb
 always_comb begin
     case (mem_wb_op)
-        `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW: begin
+        `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_CLZ, `OP_PCNT, `OP_SBCLR: begin
             reg_waddr = mem_reg_d;
             reg_wdata = mem_exe_result;
             reg_we = 1'b1;
@@ -370,7 +370,7 @@ reg[4:0] wb_reg_s, wb_reg_t, wb_reg_d;
 
 localparam INST_INVALID = 32'b0;
 
-always_ff @(posedge clk_11M0592 or posedge reset_btn) begin
+always_ff @(posedge clk_50M or posedge reset_btn) begin
     if (reset_btn) begin
         reg_inst <= INST_INVALID;
         exe_mem_op <= `OP_INVALID;
