@@ -1,6 +1,7 @@
 `default_nettype none
 `timescale 1ns / 1ps
 `include "mem.vh"
+`include "csr.vh"
 
 module mem (
     input wire[3:0] inst,
@@ -9,6 +10,7 @@ module mem (
     input wire clk,
     input wire rst,
     
+    output reg[3:0] cur_exception,
     output wire done,
     output wire idle,
     output wire[31:0] data_out,
@@ -102,6 +104,10 @@ assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] :
                        (addr[1:0] == 2'b01 ? ext_ram_data[15:8] :
                        (addr[1:0] == 2'b10 ? ext_ram_data[23:16] : ext_ram_data[31:24]));
 
+always_comb begin
+    if (mtime >= mtimecmp) cur_exception = `EXCEPT_TIMEOUT;
+    else cur_exception = `EXCEPT_NONE;
+end
 
 always_comb begin
     cur_data_out = 32'b0;
@@ -271,9 +277,10 @@ always_ff @(posedge clk or posedge rst) begin
                 `MEM_MTIMECMP_LO: mtimecmp <= { mtimecmp[63:32], cur_data_in };
                 `MEM_MTIMECMP_HI: mtimecmp <= { cur_data_in, mtimecmp[31:0] };
             endcase
+        end else begin
+            mtime <= mtime + 1;
         end
     end
 end
-
     
 endmodule

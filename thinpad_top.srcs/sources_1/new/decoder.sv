@@ -10,7 +10,8 @@ module decoder(
     output wire[4:0]        reg_d,
     output reg[5:0]         op,
     output reg[31:0]        imm,
-    output reg              imm_select
+    output reg              imm_select,
+    output reg[3:0]         cur_exception
     );
     
     wire sign;
@@ -21,11 +22,26 @@ module decoder(
     assign reg_s = (inst[6:0] == 7'b0110111) ? 5'b00000 : inst[19:15]; // lui should have zero as s1
     assign reg_t = (inst[6:0] == 7'b1110011) ? csr_reg : inst[24:20]; // csr_reg will replace reg_t at CSR instructions
     reg[4:0] csr_reg;
+
+    always_comb begin
+        if (op == `OP_INVALID && inst != 32'h0) begin
+            cur_exception = `EXCEPT_ILLEGAL_INST;
+        end else begin
+            cur_exception = `EXCEPT_NONE;
+            case (op)
+                `OP_ECALL: cur_exception = `EXCEPT_U_ECALL;
+                `OP_EBREAK: cur_exception = `EXCEPT_EBREAK;
+                `OP_MRET: cur_exception = `EXCEPT_MRET;
+                default: begin end
+            endcase
+        end
+    end
     
     always_comb begin
         op = `OP_INVALID;
         imm = 32'h0;
         imm_select = 1'b0;
+        csr_reg = `CSR_ZERO;
         case (inst[6:0])
             7'b0110011: begin // R type
                 case ({inst[31:25], inst[14:12]}) // funct7 and funct3
@@ -118,8 +134,19 @@ module decoder(
                     12'b001100000000: csr_reg = `CSR_MSTATUS;
                     default: csr_reg = `CSR_ZERO;
                 endcase
+                case (inst[14:12])
+                    3'b011: op = `OP_CSRRC;
+                    3'b010: op = `OP_CSRRS;
+                    3'b001: op = `OP_CSRRW;
+                    3'b000: case (inst[31:7])
+                        25'b0000000000010000000000000: op = `OP_EBREAK;
+                        25'b0000000000000000000000000: op = `OP_ECALL;
+                        25'b0011000000100000000000000: op = `OP_MRET;
+                        default: begin end
+                    endcase
+                    default: begin end
+                endcase
             end
-            // TODO: ecall ebreak
             default: begin end
         endcase
     end

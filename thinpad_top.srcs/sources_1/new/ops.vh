@@ -24,3 +24,10 @@
 `define OP_BGE `OP_LENGTH'h15
 `define OP_BLTU `OP_LENGTH'h16
 `define OP_BGEU `OP_LENGTH'h17
+
+`define OP_CSRRC `OP_LENGTH'h30
+`define OP_CSRRS `OP_LENGTH'h31
+`define OP_CSRRW `OP_LENGTH'h32
+`define OP_EBREAK `OP_LENGTH'h33
+`define OP_ECALL `OP_LENGTH'h34
+`define OP_MRET `OP_LENGTH'h35

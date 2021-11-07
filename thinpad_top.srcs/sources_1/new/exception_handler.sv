@@ -14,6 +14,7 @@ module exception_handler(
     input wire[31:0]    cur_exception_pc,
 
     output wire[31:0]   mtvec,
+    output wire[31:0]   mepc,
     output wire[31:0]   rdata,
     output wire         is_exception
     );
@@ -30,7 +31,8 @@ module exception_handler(
 
     reg[31:0] csrs[0:31];
     assign mtvec = csrs[`CSR_MTVEC];
-    assign rdata = csrs[raddr];
+    assign mepc = csrs[`CSR_MEPC];
+    assign rdata = raddr == 5'b0 ? 32'b0 : csrs[raddr];
 
     typedef enum reg[1:0] { USER, SUPERVISOR, MACHINE } mode_t;
     mode_t mode;
@@ -49,14 +51,14 @@ module exception_handler(
     always_comb begin
         is_exception_reg = 1'b0;
         case (cur_exception)
-            `EXCEPT_U_ECALL: begin
-                if (mode == USER) is_exception_reg = 1'b1;
-            end
-            `EXCEPT_EBREAK: begin
-                if (mode == USER) is_exception_reg = 1'b1;
-            end
+            `EXCEPT_U_ECALL: if (mode == USER) is_exception_reg = 1'b1;
+            `EXCEPT_EBREAK: if (mode == USER) is_exception_reg = 1'b1;
+            `EXCEPT_MRET: if (mode == MACHINE) is_exception_reg = 1'b1;
             default: begin end
         endcase
+        if ((`STATUS_MIE || mode < MACHINE) && `MIE[IDX_TIMEOUT] && `MIP[IDX_TIMEOUT]) begin
+            is_exception_reg = 1'b1;
+        end
     end
 
     always_ff @(posedge clk or negedge rst) begin
@@ -97,28 +99,42 @@ module exception_handler(
         end else begin
             if (mem_done) begin // trigger current exception
                 if (is_exception) begin
-                    csrs[`CSR_MEPC] <= cur_exception_pc;
                     case (cur_exception)
                         `EXCEPT_U_ECALL: begin
-                            mode <= MACHINE;
+                            csrs[`CSR_MEPC] <= cur_exception_pc;
                             csrs[`CSR_MCAUSE] <= CAUSE_U_ECALL;
+                            `STATUS_MPP <= mode;
+                            mode <= MACHINE;
                         end
-                        default: begin end
+                        `EXCEPT_EBREAK: begin
+                            csrs[`CSR_MEPC] <= cur_exception_pc;
+                            csrs[`CSR_MCAUSE] <= CAUSE_EBREAK;
+                            `STATUS_MPP <= mode;
+                            mode <= MACHINE;
+                        end
+                        `EXCEPT_MRET: begin
+                            `STATUS_MPP <= 2'b00;
+                            mode <= `STATUS_MPP;
+                        end
+                        default: begin 
+                            if ((`STATUS_MIE || mode < MACHINE) && 
+                                `MIE[IDX_TIMEOUT] && `MIP[IDX_TIMEOUT]) begin // timeout
+                                `MIP[IDX_TIMEOUT] <= 1'b0; // ?????
+                                csrs[`CSR_MEPC] <= cur_exception_pc;
+                                csrs[`CSR_MCAUSE] <= CAUSE_TIMEOUT;
+                                `STATUS_MPP <= mode;
+                                mode <= MACHINE;
+                            end
+                        end
                     endcase
-                end else if (`STATUS_MIE || mode < MACHINE) begin // maybe trigger interrupt
-                    if (`MIE[IDX_TIMEOUT] && `MIP[IDX_TIMEOUT]) begin
-                        csrs[`CSR_MEPC] <= cur_exception_pc;
-                    end
-                end   
+                end
             // for accurate interrupt, I won't optimize the ram again.
             end else begin // handle other commands (csrrs etc.)
                 if (mode == MACHINE) csrs[waddr] <= wdata;
                 // set MIP
                 case (cur_exception)
                     `EXCEPT_TIMEOUT: begin
-                        if (`MIE[IDX_TIMEOUT]) begin
-                            `MIP[IDX_TIMEOUT] <= 1'b1; 
-                        end
+                        if (`MIE[IDX_TIMEOUT]) `MIP[IDX_TIMEOUT] <= 1'b1;
                     end
                     default: begin end
                 endcase
