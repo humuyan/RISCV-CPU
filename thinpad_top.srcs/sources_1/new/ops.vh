@@ -28,3 +28,4 @@
 `define OP_LBU `OP_LENGTH'h22
 `define OP_LHU `OP_LENGTH'h23
 `define OP_SH `OP_LENGTH'h24
+`define OP_SLTU `OP_LENGTH'h25

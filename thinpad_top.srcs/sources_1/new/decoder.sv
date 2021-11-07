@@ -30,9 +30,10 @@ module decoder(
             7'b0110011: begin // R type
                 case ({inst[31:25], inst[14:12]}) // funct7 and funct3
                     10'b0000000_000: op = `OP_ADD;
-                    10'b0000000_111: op = `OP_AND;
-                    10'b0000000_110: op = `OP_OR;
+                    10'b0000000_011: op = `OP_SLTU;
                     10'b0000000_100: op = `OP_XOR;
+                    10'b0000000_110: op = `OP_OR;
+                    10'b0000000_111: op = `OP_AND;
                     default: begin end
                 endcase
             end

@@ -53,6 +53,7 @@ module alu(
             `SRL: result = a >> b;
             `SRA: result = $signed(a) >>> b;                
             `ROL: result = (a << b) | (a >> (32 - b)); 
+            `SLTU: result = (a < b);
             default: result = 0;
         endcase
         
