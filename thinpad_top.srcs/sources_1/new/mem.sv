@@ -92,12 +92,10 @@ assign base_byte_data = addr[1:0] == 2'b00 ? base_ram_data[7:0] :
                         (addr[1:0] == 2'b10 ? base_ram_data[23:16] : base_ram_data[31:24]));
 
 wire base_half_sign;
-assign base_half_sign = addr[1:0] == 2'b00 ? base_ram_data[15] : 
-                        (addr[1:0] == 2'b01 ? base_ram_data[23] : base_ram_data[31]);
+assign base_half_sign = addr[1:0] == 2'b00 ? base_ram_data[15] : base_ram_data[31];
 
 wire[7:0] base_half_data;
-assign base_half_data = addr[1:0] == 2'b00 ? base_ram_data[15:0] : 
-                        (addr[1:0] == 2'b01 ? base_ram_data[23:8] : base_ram_data[31:16]);
+assign base_half_data = addr[1:0] == 2'b00 ? base_ram_data[15:0] : base_ram_data[31:16];
 
 
 wire ext_byte_sign;
@@ -111,12 +109,10 @@ assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] :
                        (addr[1:0] == 2'b10 ? ext_ram_data[23:16] : ext_ram_data[31:24]));
 
 wire ext_half_sign;
-assign ext_half_sign = addr[1:0] == 2'b00 ? ext_ram_data[15] : 
-                       (addr[1:0] == 2'b01 ? ext_ram_data[23] : ext_ram_data[31]);
+assign ext_half_sign = addr[1:0] == 2'b00 ? ext_ram_data[15] : ext_ram_data[31];
 
 wire[7:0] ext_half_data;
-assign ext_half_data = addr[1:0] == 2'b00 ? ext_ram_data[15:0] : 
-                       (addr[1:0] == 2'b01 ? ext_ram_data[23:8] : ext_ram_data[31:16]);
+assign ext_half_data = addr[1:0] == 2'b00 ? ext_ram_data[15:0] : ext_ram_data[31:16];
 
 
 always_comb begin
@@ -219,10 +215,6 @@ always_comb begin
                                     2'b00: begin
                                         ram_be_n = 4'b1100;
                                         cur_data_in = {16'b0, data_in[15:0]};
-                                    end
-                                    2'b01: begin
-                                        ram_be_n = 4'b1001;
-                                        cur_data_in = {8'b0, data_in[15:0], 8'b0};
                                     end
                                     2'b10: begin
                                         ram_be_n = 4'b0011;
