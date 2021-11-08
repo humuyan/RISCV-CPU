@@ -46,10 +46,14 @@ module decoder(
             7'b0110011: begin // R type
                 case ({inst[31:25], inst[14:12]}) // funct7 and funct3
                     10'b0000000_000: op = `OP_ADD;
+                    10'b0100000_000: op = `OP_SUB;
+                    10'b0000000_001: op = `OP_SLL;
                     10'b0000000_011: op = `OP_SLTU;
                     10'b0000000_100: op = `OP_XOR;
                     10'b0000000_110: op = `OP_OR;
                     10'b0000000_111: op = `OP_AND;
+                    10'b0000000_101: op = `OP_SRL;
+                    10'b0100000_101: op = `OP_SRA;
                     default: begin end
                 endcase
             end
@@ -58,14 +62,17 @@ module decoder(
                 imm_select = 1'b1;
                 case (inst[14:12])
                     3'b000: op = `OP_ADDI;
-                    3'b111: op = `OP_ANDI;
+                    3'b011: op = `OP_SLTIU;
+                    3'b100: op = `OP_XORI;
                     3'b110: op = `OP_ORI;
+                    3'b111: op = `OP_ANDI;
                     3'b001: begin
                         if (inst[31:25] == 7'b0000000) op = `OP_SLLI;
                         else begin end
                     end
                     3'b101: begin
                         if (inst[31:25] == 7'b0000000) op = `OP_SRLI;
+                        else if (inst[31:25] == 7'b0100000) op = `OP_SRAI;
                         else begin end
                     end
                     default: begin end
