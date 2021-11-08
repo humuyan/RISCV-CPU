@@ -30,6 +30,13 @@
 `define OP_LHU `OP_LENGTH'h23
 `define OP_SH `OP_LENGTH'h24
 `define OP_SLTU `OP_LENGTH'h25
+`define OP_SLTIU `OP_LENGTH'h26
+`define OP_XORI `OP_LENGTH'h27
+`define OP_SRA `OP_LENGTH'h28
+`define OP_SRAI `OP_LENGTH'h29
+`define OP_SUB `OP_LENGTH'h2a
+`define OP_SLL `OP_LENGTH'h2b
+`define OP_SRL `OP_LENGTH'h2c
 
 `define OP_CSRRC `OP_LENGTH'h30
 `define OP_CSRRS `OP_LENGTH'h31
