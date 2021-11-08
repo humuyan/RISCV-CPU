@@ -2,6 +2,7 @@
 `include "alu.vh"
 `include "ops.vh"
 `include "mem.vh"
+`include "csr.vh"
 
 module thinpad_top(
     input wire clk_50M,           //50MHz 时钟输入
@@ -103,7 +104,7 @@ assign number = num_reg;
 assign leds = pc[15:0];
 
 // interface to memory
-reg[3:0] mem_inst;
+reg[4:0] mem_inst;
 reg[31:0] mem_addr;
 reg[31:0] mem_data_in;
 wire[31:0] mem_data_out;
@@ -145,7 +146,9 @@ mem _mem(
     .uart_wrn(uart_wrn),
     .uart_dataready(uart_dataready),
     .uart_tbre(uart_tbre),
-    .uart_tsre(uart_tsre)
+    .uart_tsre(uart_tsre),
+    .mtip(mtip),
+    .cur_exception(mem_exception)
 );
 
 reg[31:0] reg_inst;
@@ -161,7 +164,8 @@ decoder _decoder(
     .reg_d(reg_d),
     .op(id_exe_op),
     .imm(imm),
-    .imm_select(imm_select)
+    .imm_select(imm_select),
+    .cur_exception(id_exception)
 );
 
 reg[4:0] reg_waddr;
@@ -198,15 +202,18 @@ wire[3:0] exe_flags;
 // alu
 always_comb begin
     case (exe_mem_op)
-        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW: alu_op = `ADD;
+        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SH, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW: alu_op = `ADD;
         `OP_AND, `OP_ANDI: alu_op = `AND;
         `OP_OR, `OP_ORI: alu_op = `OR;
-        `OP_SLLI: alu_op = `SLL;
-        `OP_SRLI: alu_op = `SRL;
-        `OP_XOR: alu_op = `XOR;
         `OP_CLZ: alu_op = `CLZ;
         `OP_PCNT: alu_op = `PCNT;
         `OP_SBCLR: alu_op = `SBCLR;
+        `OP_SLLI, `OP_SLL: alu_op = `SLL;
+        `OP_SRLI, `OP_SRL: alu_op = `SRL;
+        `OP_XOR, `OP_XORI: alu_op = `XOR;
+        `OP_SLTU, `OP_SLTIU: alu_op = `SLTU;
+        `OP_SRA, `OP_SRAI: alu_op = `SRA;
+        `OP_SUB: alu_op = `SUB;
         default: alu_op = `ZERO;
     endcase
 end
@@ -297,20 +304,24 @@ always_comb begin
     mem_inst = `MEM_IDLE_IDLE;
     if (mem_occupied_by == MEM_MEM) begin
         case (mem_wb_op)
-            `OP_LB, `OP_LW: begin
+            `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU: begin
                 mem_data_in = 32'b0;
                 mem_addr = mem_exe_result;
                 case (mem_wb_op)
                     `OP_LB: mem_inst = `MEM_READ_BYTE;
+                    `OP_LBU: mem_inst = `MEM_READ_BYTE_UNSIGNED;
+                    `OP_LH: mem_inst = `MEM_READ_HALF;
+                    `OP_LHU: mem_inst = `MEM_READ_HALF_UNSIGNED;
                     `OP_LW: mem_inst = `MEM_READ_WORD;
                     default: begin end
                 endcase
             end
-            `OP_SB, `OP_SW: begin
+            `OP_SB, `OP_SW, `OP_SH: begin
                 mem_data_in = (wb_reg_d == mem_reg_t && wb_reg_d != 5'b0) ? wb_exe_result : mem_exe_reg_t_val;
                 mem_addr = mem_exe_result;
                 case (mem_wb_op)
                     `OP_SB: mem_inst = `MEM_WRITE_BYTE;
+                    `OP_SH: mem_inst = `MEM_WRITE_HALF;
                     `OP_SW: mem_inst = `MEM_WRITE_WORD;
                     default: begin end
                 endcase
@@ -328,7 +339,7 @@ end
 // wb
 always_comb begin
     case (mem_wb_op)
-        `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_CLZ, `OP_PCNT, `OP_SBCLR: begin
+        `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SLTU, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_SLTIU, `OP_XORI, `OP_SRA, `OP_SRAI, `OP_SUB, `OP_SLL, `OP_SRL, `OP_CLZ, `OP_PCNT, `OP_SBCLR: begin
             reg_waddr = mem_reg_d;
             reg_wdata = mem_exe_result;
             reg_we = 1'b1;
@@ -350,17 +361,98 @@ wire[31:0] raw_exe_reg_s_val, raw_exe_reg_t_val;
 assign raw_exe_reg_s_val = ((mem_reg_d == exe_reg_s && mem_reg_d != 5'b0) ? mem_exe_result : exe_reg_s_val);
 assign raw_exe_reg_t_val = ((mem_reg_d == exe_reg_t && mem_reg_d != 5'b0) ? mem_exe_result : exe_reg_t_val);
 
+wire exe_is_csr_op;
+assign exe_is_csr_op = (exe_mem_op == `OP_CSRRC || exe_mem_op == `OP_CSRRS || exe_mem_op == `OP_CSRRW);
 alu _alu(
     .op(alu_op),
-    .a((exe_mem_op == `OP_BEQ || exe_mem_op == `OP_BNE || exe_mem_op == `OP_AUIPC || exe_mem_op == `OP_JAL) ? exe_mem_pc : raw_exe_reg_s_val),
-    .b(exe_imm_select ? exe_imm : raw_exe_reg_t_val),
+    .a((exe_mem_op == `OP_BEQ || exe_mem_op == `OP_BNE || exe_mem_op == `OP_AUIPC || exe_mem_op == `OP_JAL) ? exe_mem_pc : 
+       (exe_is_csr_op ? 32'b0 : raw_exe_reg_s_val)), // csr op needs all zero to get csr value
+    .b(exe_imm_select ? exe_imm : 
+       (exe_is_csr_op && csr_waddr == exe_reg_t && csr_waddr != 5'b0 ? csr_wdata : raw_exe_reg_t_val)), // csr is moved to EXE so I need to handle data dependency
     .r(exe_result),
     .flags(exe_flags)
 );
 
-reg[`OP_LENGTH_1:0] mem_wb_op; // current id_exe_op in x state 
-// some reg info passed by ALU
+typedef enum reg[2:0] { EXCEPT_NO_PLACE, EXCEPT_IF, EXCEPT_ID, EXCEPT_MEM } except_place_t;
+reg[3:0] id_exception, mem_exception;
+reg[3:0] cur_exception;
+reg[31:0] cur_exception_pc;
+except_place_t cur_except_place;
 
+always_comb begin
+    if (mem_exception != `EXCEPT_NONE) begin
+        cur_except_place = EXCEPT_MEM;
+        cur_exception = mem_exception;
+        cur_exception_pc = mem_wb_pc;
+    end else if (id_exception != `EXCEPT_NONE) begin
+        cur_except_place = EXCEPT_ID;
+        cur_exception = id_exception;
+        cur_exception_pc = id_exe_pc;
+    end else begin // timeout
+        cur_except_place = EXCEPT_IF;
+        cur_exception = `EXCEPT_NONE;
+        cur_exception_pc = pc;
+    end
+end
+
+wire[31:0] mtvec, mepc, csr_val;
+wire is_exception, mtip;
+reg csr_we;
+reg[4:0] csr_waddr;
+reg[31:0] csr_wdata;
+
+always_comb begin
+    case (exe_mem_op)
+        `OP_CSRRC: begin
+            csr_we = 1'h1;
+            csr_waddr = exe_reg_t;
+            csr_wdata = csr_val & raw_exe_reg_s_val;
+        end
+        `OP_CSRRS: begin
+            csr_we = 1'h1;
+            csr_waddr = exe_reg_t;
+            csr_wdata = csr_val | raw_exe_reg_s_val;
+        end
+        `OP_CSRRW: begin
+            csr_we = 1'h1;
+            csr_waddr = exe_reg_t;
+            csr_wdata = raw_exe_reg_s_val;
+        end
+        default: begin
+            csr_we = 1'h0;
+            csr_waddr = 5'h0;
+            csr_wdata = 32'h0;
+        end
+    endcase
+end
+exception_handler _exception_handler(
+    .clk(clk_50M),
+    .rst(reset_btn),
+    .mem_done(mem_done),
+    .mem_occupied_by(mem_occupied_by),
+    .we(csr_we),
+    .waddr(csr_waddr),
+    .wdata(csr_wdata),
+    .raddr(exe_reg_t),
+    .cur_exception(cur_exception),
+    .cur_exception_pc(cur_exception_pc),
+    .mtvec(mtvec),
+    .mepc(mepc),
+    .rdata(csr_val),
+    .mtip(mtip),
+    .is_exception(is_exception)
+);
+
+wire is_csr_op;
+assign is_csr_op = (id_exe_op == `OP_CSRRC || id_exe_op == `OP_CSRRS || id_exe_op == `OP_CSRRW);
+
+reg[31:0] id_reg_s_val, id_reg_t_val;
+always_comb begin
+    id_reg_s_val = reg_rdata1;
+    id_reg_t_val = is_csr_op ? csr_val : reg_rdata2;
+end
+
+reg[`OP_LENGTH_1:0] mem_wb_op;
 reg[4:0] exe_reg_s, exe_reg_t;
 reg[31:0] mem_exe_reg_s_val, mem_exe_reg_t_val;
 reg[31:0] mem_exe_result;
@@ -370,6 +462,7 @@ reg[4:0] wb_reg_s, wb_reg_t, wb_reg_d;
 
 localparam INST_INVALID = 32'b0;
 
+
 always_ff @(posedge clk_50M or posedge reset_btn) begin
     if (reset_btn) begin
         reg_inst <= INST_INVALID;
@@ -377,64 +470,104 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
         pc <= 32'h80000000;
     end else begin
         if (mem_done) begin
-            if (mem_occupied_by == MEM_IF) begin          
-                // PC (in exe state)       
-                id_exe_pred_pc <= pred_pc;
-                exe_mem_pred_pc <= id_exe_pred_pc;
-                if (is_jump_op && (next_pc != exe_mem_pred_pc)) begin
-                    num_reg <= 8'h01;
-                    pc <= next_pc; // pred failed, use next_pc and stop the pipeline
-                    reg_inst <= INST_INVALID; 
-                    exe_mem_op <= `OP_INVALID;
-                    id_exe_pc <= 0;
-                    exe_mem_pc <= 0;
-                    exe_reg_s_val <= 0;
-                    exe_reg_t_val <= 0;
-                    exe_reg_s <= 0;
-                    exe_reg_t <= 0;
-                    exe_reg_d <= 0;
-                    exe_imm <= 0;
-                    exe_imm_select <= 0;
-                end else begin
-                    num_reg <= 8'h00;
-                    pc <= pred_pc; // pred success or sequential, use pred_pc is ok
-                    reg_inst <= mem_data_out;
-                    exe_mem_op <= id_exe_op;
-                    id_exe_pc <= pc;
-                    exe_mem_pc <= id_exe_pc;
-                    exe_reg_s_val <= reg_rdata1;
-                    exe_reg_t_val <= reg_rdata2;
-                    exe_reg_s <= reg_s;
-                    exe_reg_t <= reg_t;
-                    exe_reg_d <= reg_d;
-                    exe_imm <= imm;
-                    exe_imm_select <= imm_select;
-                end
-
-                // IF-ID
-                // EXE
-                mem_wb_pc <= exe_mem_pc;
-                mem_wb_op <= exe_mem_op;
-                case (exe_mem_op) // aka next mem_wb_op  (what is aka?)
-                    `OP_LB, `OP_LW, `OP_SB, `OP_SW: mem_occupied_by <= MEM_MEM;
-                    default: mem_occupied_by <= MEM_IF;
+            if (is_exception) begin
+                // PC jump
+                case (cur_except_place)
+                    EXCEPT_ID: begin
+                        case (cur_exception)
+                            `EXCEPT_MRET: pc <= mepc;
+                            default: pc <= mtvec;
+                        endcase
+                    end
+                    default: pc <= mtvec;
                 endcase
-                mem_exe_reg_s_val <= exe_reg_s_val;
-                mem_exe_reg_t_val <= exe_reg_t_val;
-                mem_exe_result <= exe_result;
-                mem_reg_s <= exe_reg_s;
-                mem_reg_t <= exe_reg_t;
-                mem_reg_d <= exe_reg_d;
-                
-                // MEM
-                wb_exe_result <= mem_exe_result;
-                wb_reg_s <= mem_reg_s;
-                wb_reg_t <= mem_reg_t;
-                wb_reg_d <= mem_reg_d;
-                
+                // stop the pipeline
+                case (cur_except_place)
+                    EXCEPT_ID: begin // kill the pipeline of if
+                        reg_inst <= INST_INVALID;
+                    end
+                    EXCEPT_MEM: begin // kill the pipeline from if to exe
+                        reg_inst <= INST_INVALID; 
+                        exe_mem_op <= `OP_INVALID;
+                        id_exe_pc <= 0;
+                        exe_mem_pc <= 0;
+                        exe_reg_s_val <= 0;
+                        exe_reg_t_val <= 0;
+                        exe_reg_s <= 0;
+                        exe_reg_t <= 0;
+                        exe_reg_d <= 0;
+                        exe_imm <= 0;
+                        exe_imm_select <= 0;
+                        mem_wb_pc <= 0;
+                        mem_wb_op <= 0;
+                        mem_occupied_by <= MEM_IF;
+                        mem_exe_reg_s_val <= 0;
+                        mem_exe_reg_t_val <= 0;
+                        mem_exe_result <= 0;
+                        mem_reg_s <= 0;
+                        mem_reg_t <= 0;
+                        mem_reg_d <= 0;
+                    end
+                    default: begin end
+                endcase
             end else begin
-                mem_occupied_by <= MEM_IF;
-                mem_exe_result <= mem_data_out; // save it in case it changes
+                if (mem_occupied_by == MEM_IF) begin          
+                // PC (in exe state)       
+                    id_exe_pred_pc <= pred_pc;
+                    exe_mem_pred_pc <= id_exe_pred_pc;
+                    if (is_jump_op && (next_pc != exe_mem_pred_pc)) begin
+                        pc <= next_pc; // pred failed, use next_pc and stop the pipeline
+                        reg_inst <= INST_INVALID; 
+                        exe_mem_op <= `OP_INVALID;
+                        id_exe_pc <= 0;
+                        exe_mem_pc <= 0;
+                        exe_reg_s_val <= 0;
+                        exe_reg_t_val <= 0;
+                        exe_reg_s <= 0;
+                        exe_reg_t <= 0;
+                        exe_reg_d <= 0;
+                        exe_imm <= 0;
+                        exe_imm_select <= 0;
+                    end else begin
+                        pc <= pred_pc; // pred success or sequential, use pred_pc is ok
+                        reg_inst <= mem_data_out;
+                        exe_mem_op <= id_exe_op;
+                        id_exe_pc <= pc;
+                        exe_mem_pc <= id_exe_pc;
+                        exe_reg_s_val <= id_reg_s_val;
+                        exe_reg_t_val <= id_reg_t_val;
+                        exe_reg_s <= reg_s;
+                        exe_reg_t <= reg_t;
+                        exe_reg_d <= reg_d;
+                        exe_imm <= imm;
+                        exe_imm_select <= imm_select;
+                    end
+
+                    // IF-ID
+                    // EXE
+                    mem_wb_pc <= exe_mem_pc;
+                    mem_wb_op <= exe_mem_op;
+                    case (exe_mem_op) // aka next mem_wb_op
+                        `OP_LB, `OP_LW, `OP_LH, `OP_SH, `OP_LHU, `OP_LBU, `OP_SB, `OP_SW: mem_occupied_by <= MEM_MEM;
+                        default: mem_occupied_by <= MEM_IF;
+                    endcase
+                    mem_exe_reg_s_val <= exe_reg_s_val;
+                    mem_exe_reg_t_val <= exe_reg_t_val;
+                    mem_exe_result <= exe_result;
+                    mem_reg_s <= exe_reg_s;
+                    mem_reg_t <= exe_reg_t;
+                    mem_reg_d <= exe_reg_d;
+                    
+                    // MEM
+                    wb_exe_result <= mem_exe_result;
+                    wb_reg_s <= mem_reg_s;
+                    wb_reg_t <= mem_reg_t;
+                    wb_reg_d <= mem_reg_d;
+                    
+                end else begin
+                    mem_occupied_by <= MEM_IF;
+                    mem_exe_result <= mem_data_out; // save it in case it changes
+                end
             end
         end else begin end
     end

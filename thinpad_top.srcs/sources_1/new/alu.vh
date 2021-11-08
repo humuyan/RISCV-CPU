@@ -12,3 +12,4 @@
 `define CLZ     4'b1011
 `define PCNT    4'b1100
 `define SBCLR   4'b1101
+`define SLTU    4'b1110

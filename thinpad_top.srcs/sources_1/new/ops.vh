@@ -24,7 +24,25 @@
 `define OP_BGE `OP_LENGTH'h15
 `define OP_BLTU `OP_LENGTH'h16
 `define OP_BGEU `OP_LENGTH'h17
-
 `define OP_CLZ `OP_LENGTH'h18
 `define OP_SBCLR `OP_LENGTH'h19
 `define OP_PCNT `OP_LENGTH'h20
+`define OP_LH `OP_LENGTH'h21
+`define OP_LBU `OP_LENGTH'h22
+`define OP_LHU `OP_LENGTH'h23
+`define OP_SH `OP_LENGTH'h24
+`define OP_SLTU `OP_LENGTH'h25
+`define OP_SLTIU `OP_LENGTH'h26
+`define OP_XORI `OP_LENGTH'h27
+`define OP_SRA `OP_LENGTH'h28
+`define OP_SRAI `OP_LENGTH'h29
+`define OP_SUB `OP_LENGTH'h2a
+`define OP_SLL `OP_LENGTH'h2b
+`define OP_SRL `OP_LENGTH'h2c
+
+`define OP_CSRRC `OP_LENGTH'h30
+`define OP_CSRRS `OP_LENGTH'h31
+`define OP_CSRRW `OP_LENGTH'h32
+`define OP_EBREAK `OP_LENGTH'h33
+`define OP_ECALL `OP_LENGTH'h34
+`define OP_MRET `OP_LENGTH'h35

@@ -98,6 +98,7 @@ module alu(
                 end
             end
             `SBCLR: result = a & (~(1 << b[4:0]));
+            `SLTU: result = {31'b0, (a < b)};
             default: result = 0;
         endcase
         
