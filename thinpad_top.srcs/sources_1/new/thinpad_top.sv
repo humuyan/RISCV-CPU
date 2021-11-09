@@ -214,6 +214,7 @@ always_comb begin
         `OP_SLTU, `OP_SLTIU: alu_op = `SLTU;
         `OP_SRA, `OP_SRAI: alu_op = `SRA;
         `OP_SUB: alu_op = `SUB;
+        `OP_SLT, `OP_SLTI: alu_op = `SLT;
         default: alu_op = `ZERO;
     endcase
 end
@@ -339,7 +340,7 @@ end
 // wb
 always_comb begin
     case (mem_wb_op)
-        `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SLTU, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_SLTIU, `OP_XORI, `OP_SRA, `OP_SRAI, `OP_SUB, `OP_SLL, `OP_SRL, `OP_CLZ, `OP_PCNT, `OP_SBCLR: begin
+        `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SLTU, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_SLTIU, `OP_XORI, `OP_SRA, `OP_SRAI, `OP_SUB, `OP_SLL, `OP_SRL, `OP_CLZ, `OP_PCNT, `OP_SBCLR, `OP_SLT, `OP_SLTI: begin
             reg_waddr = mem_reg_d;
             reg_wdata = mem_exe_result;
             reg_we = 1'b1;
