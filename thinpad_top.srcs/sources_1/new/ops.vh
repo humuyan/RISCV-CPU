@@ -39,6 +39,8 @@
 `define OP_SUB `OP_LENGTH'h2a
 `define OP_SLL `OP_LENGTH'h2b
 `define OP_SRL `OP_LENGTH'h2c
+`define OP_SLT `OP_LENGTH'h2d
+`define OP_SLTI `OP_LENGTH'h2e
 
 `define OP_CSRRC `OP_LENGTH'h30
 `define OP_CSRRS `OP_LENGTH'h31

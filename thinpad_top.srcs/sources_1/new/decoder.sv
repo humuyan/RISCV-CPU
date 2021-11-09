@@ -48,6 +48,7 @@ module decoder(
                     10'b0000000_000: op = `OP_ADD;
                     10'b0100000_000: op = `OP_SUB;
                     10'b0000000_001: op = `OP_SLL;
+                    10'b0000000_010: op = `OP_SLT;
                     10'b0000000_011: op = `OP_SLTU;
                     10'b0000000_100: op = `OP_XOR;
                     10'b0100100_001: op = `OP_SBCLR;
@@ -65,6 +66,7 @@ module decoder(
 
                 case (inst[14:12])
                     3'b000: op = `OP_ADDI;
+                    3'b010: op = `OP_SLTI;
                     3'b011: op = `OP_SLTIU;
                     3'b100: op = `OP_XORI;
                     3'b110: op = `OP_ORI;
