@@ -202,7 +202,7 @@ wire[3:0] exe_flags;
 // alu
 always_comb begin
     case (exe_mem_op)
-        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SH, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW: alu_op = `ADD;
+        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SH, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_BLT, `OP_BLTU, `OP_BGE, `OP_BGEU: alu_op = `ADD;
         `OP_AND, `OP_ANDI: alu_op = `AND;
         `OP_OR, `OP_ORI: alu_op = `OR;
         `OP_CLZ: alu_op = `CLZ;
@@ -223,7 +223,7 @@ reg[31:0] pc, next_pc; // next pc is the real instruction after exe_mem_pc!
 reg[31:0] id_exe_pc, exe_mem_pc, mem_wb_pc;
 // pc in exe state
 reg is_jump_op, pc_jumping;
-/*
+
 always_comb begin
     pc_jumping = 1'b0;
     is_jump_op = 1'b0;
@@ -250,7 +250,7 @@ always_comb begin
         default: next_pc = exe_mem_pc + 32'h4;
     endcase
 end
-*/
+/*
 always_comb begin
     pc_jumping = 1'b0;
     is_jump_op = 1'b0;
@@ -280,7 +280,7 @@ always_comb begin
         default: next_pc = exe_mem_pc + 32'h4;
     endcase
 end
-
+*/
 reg[4:0] reg_pred_s;
 reg[31:0] reg_pred_s_data;
 reg[31:0] pred_pc;
@@ -364,10 +364,11 @@ assign raw_exe_reg_t_val = ((mem_reg_d == exe_reg_t && mem_reg_d != 5'b0) ? mem_
 
 wire exe_is_csr_op;
 assign exe_is_csr_op = (exe_mem_op == `OP_CSRRC || exe_mem_op == `OP_CSRRS || exe_mem_op == `OP_CSRRW);
+wire exe_is_branch_op;
+assign exe_is_branch_op = (exe_mem_op == `OP_BEQ || exe_mem_op == `OP_BNE || exe_mem_op == `OP_AUIPC || exe_mem_op == `OP_JAL || exe_mem_op == `OP_BLT || exe_mem_op == `OP_BLTU || exe_mem_op == `OP_BGE || exe_mem_op == `OP_BGEU);
 alu _alu(
     .op(alu_op),
-    .a((exe_mem_op == `OP_BEQ || exe_mem_op == `OP_BNE || exe_mem_op == `OP_AUIPC || exe_mem_op == `OP_JAL) ? exe_mem_pc : 
-       (exe_is_csr_op ? 32'b0 : raw_exe_reg_s_val)), // csr op needs all zero to get csr value
+    .a(exe_is_branch_op ? exe_mem_pc : (exe_is_csr_op ? 32'b0 : raw_exe_reg_s_val)), // csr op needs all zero to get csr value
     .b(exe_imm_select ? exe_imm : 
        (exe_is_csr_op && csr_waddr == exe_reg_t && csr_waddr != 5'b0 ? csr_wdata : raw_exe_reg_t_val)), // csr is moved to EXE so I need to handle data dependency
     .r(exe_result),
