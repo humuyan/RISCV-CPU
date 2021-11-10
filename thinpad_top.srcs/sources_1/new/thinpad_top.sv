@@ -108,6 +108,7 @@ reg[4:0] mem_inst;
 reg[31:0] mem_addr;
 reg[31:0] mem_data_in;
 wire[31:0] mem_data_out;
+wire[63:0] mtime;
 wire mem_done;
 wire mem_idle;
 wire[3:0] mem_state;
@@ -120,13 +121,16 @@ localparam MEM_MEM = 2;
 mem _mem(
     .inst(mem_inst),
     .addr(mem_addr),
+    .mem_occupied_by(mem_occupied_by),
     .data_in(mem_data_in),
     .clk(clk_50M),
     .rst(reset_btn),
     .done(mem_done),
     .idle(mem_idle),
+    .mode(mode),
+    .satp(satp),
     .data_out(mem_data_out),
-    .state_out(mem_state),
+    .mtime_out(mtime),
 
     .base_ram_data(base_ram_data),
     .base_ram_addr(base_ram_addr),
@@ -148,7 +152,7 @@ mem _mem(
     .uart_tbre(uart_tbre),
     .uart_tsre(uart_tsre),
     .mtip(mtip),
-    .cur_exception(mem_exception)
+    .cur_exception(mem_raising_exception)
 );
 
 reg[31:0] reg_inst;
@@ -165,7 +169,7 @@ decoder _decoder(
     .op(id_exe_op),
     .imm(imm),
     .imm_select(imm_select),
-    .cur_exception(id_exception)
+    .cur_exception(id_raising_exception)
 );
 
 reg[4:0] reg_waddr;
@@ -250,50 +254,26 @@ always_comb begin
         default: next_pc = exe_mem_pc + 32'h4;
     endcase
 end
-/*
-always_comb begin
-    pc_jumping = 1'b0;
-    is_jump_op = 1'b0;
-    case (exe_mem_op)
-        `OP_BEQ: begin
-            is_jump_op = 1'b1;
-            if (raw_exe_reg_s_val == raw_exe_reg_t_val) begin
-                pc_jumping = 1'b1;
-                next_pc = exe_result;
-            end
-            else next_pc = exe_mem_pc + 32'h4;
-        end
-        `OP_BNE: begin
-            is_jump_op = 1'b1;
-            if (raw_exe_reg_s_val != raw_exe_reg_t_val) begin
-                pc_jumping = 1'b1;
-                next_pc = exe_result;
-            end
-            else next_pc = exe_mem_pc + 32'h4;
-        end
-        // TODO: blt bge bltu bgeu
-        `OP_JAL, `OP_JALR: begin
-            is_jump_op = 1'b1;
-            pc_jumping = 1'b1;
-            next_pc = exe_result;
-        end
-        default: next_pc = exe_mem_pc + 32'h4;
-    endcase
-end
-*/
-reg[4:0] reg_pred_s;
-reg[31:0] reg_pred_s_data;
-reg[31:0] pred_pc;
+
+wire[4:0] reg_pred_s;
+wire[31:0] reg_pred_s_data;
+wire[31:0] raw_reg_pred_s_data;
+assign raw_reg_pred_s_data = (wb_reg_d == reg_pred_s && wb_reg_d != 5'b0) ? wb_exe_result : 
+                            ((mem_reg_d == reg_pred_s && mem_reg_d != 5'b0) ? mem_exe_result :
+                             (exe_reg_d == reg_pred_s && exe_reg_d != 5'b0) ? exe_result : reg_pred_s_data);
+wire[31:0] pred_pc;
+
 reg[31:0] id_exe_pred_pc, exe_mem_pred_pc;
 // pred pc
 branch_pred _branch_pred(
     .clk(clk_50M),
+    .mem_done(mem_done),
     .is_jump_op(is_jump_op),
     .last_jump_pc(exe_mem_pc[4:2]),
     .last_jump_result(pc_jumping),
     .inst(mem_data_out),
     .pc(pc),
-    .reg_s_val(reg_pred_s_data),
+    .reg_s_val(raw_reg_pred_s_data),
     .reg_s(reg_pred_s),
     .pred_pc(pred_pc)
 );
@@ -375,33 +355,29 @@ alu _alu(
     .flags(exe_flags)
 );
 
-typedef enum reg[2:0] { EXCEPT_NO_PLACE, EXCEPT_IF, EXCEPT_ID, EXCEPT_MEM } except_place_t;
-reg[3:0] id_exception, mem_exception;
+reg[3:0] id_exception, exe_exception, mem_exception;
+wire[3:0] id_raising_exception, mem_raising_exception;
 reg[3:0] cur_exception;
 reg[31:0] cur_exception_pc;
-except_place_t cur_except_place;
 
 always_comb begin
+    cur_exception_pc = mem_wb_pc;
     if (mem_exception != `EXCEPT_NONE) begin
-        cur_except_place = EXCEPT_MEM;
         cur_exception = mem_exception;
-        cur_exception_pc = mem_wb_pc;
-    end else if (id_exception != `EXCEPT_NONE) begin
-        cur_except_place = EXCEPT_ID;
-        cur_exception = id_exception;
-        cur_exception_pc = id_exe_pc;
-    end else begin // timeout
-        cur_except_place = EXCEPT_IF;
+    end else begin
         cur_exception = `EXCEPT_NONE;
-        cur_exception_pc = pc;
     end
 end
 
-wire[31:0] mtvec, mepc, csr_val;
-wire is_exception, mtip;
+wire[31:0] mtvec, mepc, satp, csr_val;
+wire is_pending_exception, mtip;
 reg csr_we;
 reg[4:0] csr_waddr;
 reg[31:0] csr_wdata;
+wire[3:0] pending_exception;
+
+typedef enum reg[1:0] { USER, SUPERVISOR, MACHINE } mode_t;
+wire[1:0] mode;
 
 always_comb begin
     case (exe_mem_op)
@@ -438,11 +414,16 @@ exception_handler _exception_handler(
     .raddr(exe_reg_t),
     .cur_exception(cur_exception),
     .cur_exception_pc(cur_exception_pc),
+    .mtime(mtime),
     .mtvec(mtvec),
     .mepc(mepc),
+    .satp(satp),
     .rdata(csr_val),
     .mtip(mtip),
-    .is_exception(is_exception)
+    .mode_out(mode),
+    .pipeline_empty(pipeline_empty),
+    .is_pending_exception(is_pending_exception),
+    .pending_exception_out(pending_exception)
 );
 
 wire is_csr_op;
@@ -464,6 +445,27 @@ reg[4:0] wb_reg_s, wb_reg_t, wb_reg_d;
 
 localparam INST_INVALID = 32'b0;
 
+wire pipeline_empty;
+assign pipeline_empty = (mem_wb_op == `OP_INVALID) && (exe_mem_op == `OP_INVALID) && 
+                        (id_exe_op == `OP_INVALID) && (reg_inst == INST_INVALID);
+
+wire pred_wrong;
+assign pred_wrong = is_jump_op && (next_pc != exe_mem_pred_pc);
+
+wire next_if_nop, next_id_nop, next_exe_nop, next_mem_nop;
+// for delayed exception handling, all the exceptions will be handled in MEM state.
+// next PC is 32'h0 (no need to fetch)
+assign next_if_nop = (is_pending_exception && (!pipeline_empty)) || cur_exception != `EXCEPT_NONE;
+// kill cur IF
+assign next_id_nop = (is_pending_exception) || cur_exception != `EXCEPT_NONE || pred_wrong;
+// kill cur ID
+assign next_exe_nop = cur_exception != `EXCEPT_NONE || pred_wrong;
+// kill cur EXE
+assign next_mem_nop = cur_exception != `EXCEPT_NONE;
+
+wire pipeline_flow;
+assign pipeline_flow = (mem_occupied_by == MEM_IF) || (cur_exception != `EXCEPT_NONE); // halt current IF is OK (if exception happens, we don't need to fetch new instruction.)
+
 
 always_ff @(posedge clk_50M or posedge reset_btn) begin
     if (reset_btn) begin
@@ -472,104 +474,98 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
         pc <= 32'h80000000;
     end else begin
         if (mem_done) begin
-            if (is_exception) begin
-                // PC jump
-                case (cur_except_place)
-                    EXCEPT_ID: begin
-                        case (cur_exception)
+            if (pipeline_flow) begin      
+                // PC (in exe state)
+                id_exe_pred_pc <= pred_pc;
+                exe_mem_pred_pc <= id_exe_pred_pc;
+
+                if (next_if_nop) begin
+                    pc <= pc; // if I change PC then page table may be no effect.
+                end else begin
+                    if (is_pending_exception && pipeline_empty) begin
+                        case (pending_exception)
                             `EXCEPT_MRET: pc <= mepc;
                             default: pc <= mtvec;
-                        endcase
-                    end
-                    default: pc <= mtvec;
-                endcase
-                // stop the pipeline
-                case (cur_except_place)
-                    EXCEPT_ID: begin // kill the pipeline of if
-                        reg_inst <= INST_INVALID;
-                    end
-                    EXCEPT_MEM: begin // kill the pipeline from if to exe
-                        reg_inst <= INST_INVALID; 
-                        exe_mem_op <= `OP_INVALID;
-                        id_exe_pc <= 0;
-                        exe_mem_pc <= 0;
-                        exe_reg_s_val <= 0;
-                        exe_reg_t_val <= 0;
-                        exe_reg_s <= 0;
-                        exe_reg_t <= 0;
-                        exe_reg_d <= 0;
-                        exe_imm <= 0;
-                        exe_imm_select <= 0;
-                        mem_wb_pc <= 0;
-                        mem_wb_op <= 0;
-                        mem_occupied_by <= MEM_IF;
-                        mem_exe_reg_s_val <= 0;
-                        mem_exe_reg_t_val <= 0;
-                        mem_exe_result <= 0;
-                        mem_reg_s <= 0;
-                        mem_reg_t <= 0;
-                        mem_reg_d <= 0;
-                    end
-                    default: begin end
-                endcase
-            end else begin
-                if (mem_occupied_by == MEM_IF) begin          
-                // PC (in exe state)       
-                    id_exe_pred_pc <= pred_pc;
-                    exe_mem_pred_pc <= id_exe_pred_pc;
-                    if (is_jump_op && (next_pc != exe_mem_pred_pc)) begin
-                        pc <= next_pc; // pred failed, use next_pc and stop the pipeline
-                        reg_inst <= INST_INVALID; 
-                        exe_mem_op <= `OP_INVALID;
-                        id_exe_pc <= 0;
-                        exe_mem_pc <= 0;
-                        exe_reg_s_val <= 0;
-                        exe_reg_t_val <= 0;
-                        exe_reg_s <= 0;
-                        exe_reg_t <= 0;
-                        exe_reg_d <= 0;
-                        exe_imm <= 0;
-                        exe_imm_select <= 0;
+                        endcase                    
+                    end else if (pred_wrong) begin
+                        pc <= next_pc;
                     end else begin
-                        pc <= pred_pc; // pred success or sequential, use pred_pc is ok
-                        reg_inst <= mem_data_out;
-                        exe_mem_op <= id_exe_op;
-                        id_exe_pc <= pc;
-                        exe_mem_pc <= id_exe_pc;
-                        exe_reg_s_val <= id_reg_s_val;
-                        exe_reg_t_val <= id_reg_t_val;
-                        exe_reg_s <= reg_s;
-                        exe_reg_t <= reg_t;
-                        exe_reg_d <= reg_d;
-                        exe_imm <= imm;
-                        exe_imm_select <= imm_select;
+                        pc <= pred_pc;
                     end
+                end
 
-                    // IF-ID
-                    // EXE
+                if (next_id_nop) begin
+                    reg_inst <= INST_INVALID;
+                    id_exe_pc <= 32'h0;
+                    id_exception <= `EXCEPT_NONE;
+                end else begin
+                    reg_inst <= mem_data_out;
+                    id_exe_pc <= pc;
+                    id_exception <= mem_raising_exception; // currently in IF (page fault...)
+                end
+
+                if (next_exe_nop) begin
+                    exe_mem_op <= `OP_INVALID;
+                    exe_mem_pc <= 32'h0;
+                    exe_reg_s_val <= 0;
+                    exe_reg_t_val <= 0;
+                    exe_reg_s <= 0;
+                    exe_reg_t <= 0;
+                    exe_reg_d <= 0;
+                    exe_imm <= 0;
+                    exe_imm_select <= 0;
+                    exe_exception <= `EXCEPT_NONE;
+                end else begin
+                    exe_mem_op <= id_exe_op;
+                    exe_mem_pc <= id_exe_pc;
+                    exe_reg_s_val <= id_reg_s_val;
+                    exe_reg_t_val <= id_reg_t_val;
+                    exe_reg_s <= reg_s;
+                    exe_reg_t <= reg_t;
+                    exe_reg_d <= reg_d;
+                    exe_imm <= imm;
+                    exe_imm_select <= imm_select;
+                    exe_exception <= (id_exception != `EXCEPT_NONE) ? id_exception : id_raising_exception;
+                end
+
+                if (next_mem_nop) begin
+                    mem_wb_op <= `OP_INVALID;
+                    mem_wb_pc <= 32'h0;
+                    mem_exe_reg_s_val <= 0;
+                    mem_exe_reg_t_val <= 0;
+                    mem_reg_s <= 0;
+                    mem_reg_t <= 0;
+                    mem_reg_d <= 0;
+                    mem_occupied_by <= MEM_IF;
+                    mem_exception <= `EXCEPT_NONE;
+                end else begin
                     mem_wb_pc <= exe_mem_pc;
                     mem_wb_op <= exe_mem_op;
-                    case (exe_mem_op) // aka next mem_wb_op
-                        `OP_LB, `OP_LW, `OP_LH, `OP_SH, `OP_LHU, `OP_LBU, `OP_SB, `OP_SW: mem_occupied_by <= MEM_MEM;
-                        default: mem_occupied_by <= MEM_IF;
-                    endcase
                     mem_exe_reg_s_val <= exe_reg_s_val;
                     mem_exe_reg_t_val <= exe_reg_t_val;
                     mem_exe_result <= exe_result;
                     mem_reg_s <= exe_reg_s;
                     mem_reg_t <= exe_reg_t;
                     mem_reg_d <= exe_reg_d;
-                    
-                    // MEM
-                    wb_exe_result <= mem_exe_result;
-                    wb_reg_s <= mem_reg_s;
-                    wb_reg_t <= mem_reg_t;
-                    wb_reg_d <= mem_reg_d;
-                    
-                end else begin
-                    mem_occupied_by <= MEM_IF;
-                    mem_exe_result <= mem_data_out; // save it in case it changes
+                    if (exe_exception != `EXCEPT_NONE) begin // aka next mem_exception (if triggers exception previously, then no need to query MEM.)
+                        mem_occupied_by <= MEM_IF;
+                    end else begin
+                        case (exe_mem_op) // aka next mem_wb_op
+                            `OP_LB, `OP_LW, `OP_LH, `OP_SH, `OP_LHU, `OP_LBU, `OP_SB, `OP_SW: mem_occupied_by <= MEM_MEM;
+                            default: mem_occupied_by <= MEM_IF;
+                        endcase
+                    end
+                    mem_exception <= exe_exception; // mem_exception will be handled in else branch
                 end
+                
+                wb_exe_result <= mem_exe_result;
+                wb_reg_s <= mem_reg_s;
+                wb_reg_t <= mem_reg_t;
+                wb_reg_d <= mem_reg_d;  
+            end else begin // occupied by mem, no need to flow the pipeline
+                mem_occupied_by <= MEM_IF;
+                mem_exe_result <= mem_data_out; // save it in case it changes
+                mem_exception <= mem_raising_exception;
             end
         end else begin end
     end

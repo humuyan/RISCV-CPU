@@ -9,13 +9,16 @@ module mem (
     input wire[31:0] data_in,
     input wire clk,
     input wire rst,
-    
+    input wire[1:0] mem_occupied_by,
+    input wire[1:0] mode,
+    input wire[31:0] satp,
+
+    output wire[63:0] mtime_out,
     output reg[3:0] cur_exception,
     output wire mtip,
     output wire done,
     output wire idle,
     output wire[31:0] data_out,
-    output wire[3:0] state_out,
     // ram
     inout wire[31:0] base_ram_data,  //BaseRAM数据，低8位与CPLD串口控制器共享
     output wire[19:0] base_ram_addr, //BaseRAM地址
@@ -39,6 +42,8 @@ module mem (
     input wire uart_tsre         //数据发送完毕标志
 );
 
+typedef enum reg[1:0] { USER, SUPERVISOR, MACHINE } mode_t;
+
 reg[8:0] done_ram_enable;
 reg[8:0] ram_enable;
 reg[31:0] cur_addr;
@@ -47,6 +52,8 @@ reg[31:0] cur_data_out;
 reg[3:0] ram_be_n;
 reg[63:0] mtime;
 reg[63:0] mtimecmp;
+
+assign mtime_out = mtime;
 
 localparam IDLE = 9'b111111111;
 localparam READ_BASE = 9'b100111111;
@@ -61,22 +68,30 @@ assign ext_ram_addr = cur_addr[19:0];
 assign base_ram_data = ((ram_enable == WRITE_BASE) || (ram_enable == WRITE_UART)) ? cur_data_in : 32'bz;
 assign ext_ram_data = (ram_enable == WRITE_EXT) ? cur_data_in : 32'bz;
 assign data_out = cur_data_out;
-assign state_out = state;
 assign base_ram_be_n = ram_be_n;
 assign ext_ram_be_n = ram_be_n;
 
-reg[3:0] state;
-localparam S_IDLE = 0;
-localparam S_RW_RAM = 1;
-localparam S_READ_UART = 2;
-localparam S_WRITE_UART = 3;
-localparam S_READ_UART_GAP = 4;
-localparam S_READ_UART_GAP_1 = 5;
-localparam S_WRITE_UART_WAIT_TBRE = 6;
-localparam S_WRITE_UART_WAIT_TBRE_1 = 7;
-localparam S_WRITE_UART_WAIT_TSRE = 8;
-localparam S_WRITE_UART_WAIT_TSRE_1 = 9;
-localparam S_DONE = 10;
+typedef enum reg[4:0] {
+    S_IDLE,
+    S_RW_RAM_U,
+    S_RW_RAM_M,
+    S_READ_UART,
+    S_WRITE_UART,
+    S_READ_UART_GAP,
+    S_READ_UART_GAP_1,
+    S_WRITE_UART_WAIT_TBRE,
+    S_WRITE_UART_WAIT_TBRE_1,
+    S_WRITE_UART_WAIT_TSRE,
+    S_WRITE_UART_WAIT_TSRE_1,
+    S_DONE_U,
+    S_DONE_M,
+    S_IDLE_U,
+    S_READ_L1_PAGE_TABLE,
+    S_READ_L1_PAGE_TABLE_1,
+    S_READ_L2_PAGE_TABLE,
+    S_READ_L2_PAGE_TABLE_1
+} mem_state_t;
+mem_state_t state, next_state;
 
 assign {
     base_ram_ce_n, base_ram_oe_n, base_ram_we_n, 
@@ -85,47 +100,78 @@ assign {
 } = ram_enable[7:0];
 
 wire base_byte_sign;
-assign base_byte_sign = addr[1:0] == 2'b00 ? base_ram_data[7] : 
-                        (addr[1:0] == 2'b01 ? base_ram_data[15] :
-                        (addr[1:0] == 2'b10 ? base_ram_data[23] : base_ram_data[31]));
+assign base_byte_sign = mapped[1:0] == 2'b00 ? base_ram_data[7] : 
+                        (mapped[1:0] == 2'b01 ? base_ram_data[15] :
+                        (mapped[1:0] == 2'b10 ? base_ram_data[23] : base_ram_data[31]));
 
 wire[7:0] base_byte_data;
-assign base_byte_data = addr[1:0] == 2'b00 ? base_ram_data[7:0] : 
-                        (addr[1:0] == 2'b01 ? base_ram_data[15:8] :
-                        (addr[1:0] == 2'b10 ? base_ram_data[23:16] : base_ram_data[31:24]));
+assign base_byte_data = mapped[1:0] == 2'b00 ? base_ram_data[7:0] : 
+                        (mapped[1:0] == 2'b01 ? base_ram_data[15:8] :
+                        (mapped[1:0] == 2'b10 ? base_ram_data[23:16] : base_ram_data[31:24]));
 
 wire base_half_sign;
-assign base_half_sign = addr[1:0] == 2'b00 ? base_ram_data[15] : base_ram_data[31];
+assign base_half_sign = mapped[1:0] == 2'b00 ? base_ram_data[15] : base_ram_data[31];
 
 wire[15:0] base_half_data;
-assign base_half_data = addr[1:0] == 2'b00 ? base_ram_data[15:0] : base_ram_data[31:16];
+assign base_half_data = mapped[1:0] == 2'b00 ? base_ram_data[15:0] : base_ram_data[31:16];
 
 
 wire ext_byte_sign;
-assign ext_byte_sign = addr[1:0] == 2'b00 ? ext_ram_data[7] : 
-                       (addr[1:0] == 2'b01 ? ext_ram_data[15] :
-                       (addr[1:0] == 2'b10 ? ext_ram_data[23] : ext_ram_data[31]));
+assign ext_byte_sign = mapped[1:0] == 2'b00 ? ext_ram_data[7] : 
+                       (mapped[1:0] == 2'b01 ? ext_ram_data[15] :
+                       (mapped[1:0] == 2'b10 ? ext_ram_data[23] : ext_ram_data[31]));
 
 wire[7:0] ext_byte_data;
-assign ext_byte_data = addr[1:0] == 2'b00 ? ext_ram_data[7:0] : 
-                       (addr[1:0] == 2'b01 ? ext_ram_data[15:8] :
-                       (addr[1:0] == 2'b10 ? ext_ram_data[23:16] : ext_ram_data[31:24]));
+assign ext_byte_data = mapped[1:0] == 2'b00 ? ext_ram_data[7:0] : 
+                       (mapped[1:0] == 2'b01 ? ext_ram_data[15:8] :
+                       (mapped[1:0] == 2'b10 ? ext_ram_data[23:16] : ext_ram_data[31:24]));
 
 wire ext_half_sign;
-assign ext_half_sign = addr[1:0] == 2'b00 ? ext_ram_data[15] : ext_ram_data[31];
+assign ext_half_sign = mapped[1:0] == 2'b00 ? ext_ram_data[15] : ext_ram_data[31];
 
 wire[15:0] ext_half_data;
-assign ext_half_data = addr[1:0] == 2'b00 ? ext_ram_data[15:0] : ext_ram_data[31:16];
+assign ext_half_data = mapped[1:0] == 2'b00 ? ext_ram_data[15:0] : ext_ram_data[31:16];
 
+typedef enum reg[1:0] { PAGE_NORMAL, PAGE_FAULT_READ, PAGE_FAULT_WRITE } page_status_t;
+page_status_t page_status, done_page_status;
 assign mtip = mtime >= mtimecmp;
+
+localparam MEM_NONE = 0;
+localparam MEM_IF = 1;
+localparam MEM_MEM = 2;
 always_comb begin
     cur_exception = `EXCEPT_NONE;
+    case (mem_occupied_by)
+        MEM_IF: if (mode != MACHINE && page_status == PAGE_FAULT_READ) cur_exception = `EXCEPT_INST_PAGE_FAULT;
+        MEM_MEM: case (page_status)
+            PAGE_FAULT_READ: cur_exception = `EXCEPT_LOAD_PAGE_FAULT;
+            PAGE_FAULT_WRITE: cur_exception = `EXCEPT_STORE_PAGE_FAULT;
+            default: begin end
+        endcase
+    endcase
+end
+
+wire page_enabled;
+assign page_enabled = (mode_t'(mode) != MACHINE && satp[31] == `PAGING_SV32);
+wire[31:0] mapped = page_enabled ? page_addr : addr;
+reg[31:0] page_table_data;
+reg[31:0] page_addr;
+
+`define SATP_PPN satp[19:0]
+`define PTE_PPN page_table_data[29:10]
+always_comb begin
+    case (state)
+        S_IDLE_U, S_READ_L1_PAGE_TABLE, S_READ_L1_PAGE_TABLE_1: page_addr = {`SATP_PPN, addr[31:22], 2'b0};
+        S_READ_L2_PAGE_TABLE, S_READ_L2_PAGE_TABLE_1: page_addr = {`PTE_PPN, addr[21:12], 2'b0}; 
+        S_RW_RAM_U, S_DONE_U: page_addr = {`PTE_PPN, addr[11:0]};
+        default: page_addr = 32'h0;
+    endcase
 end
 
 always_comb begin
     cur_data_out = 32'b0;
     case (inst[3:2])
-        `MEM_READ: casez (addr)
+        `MEM_READ: casez (mapped)
             `MEM_BASE: begin
                 case (inst[1:0])
                     `MEM_BYTE: cur_data_out = {{24{inst[4] == `SIGN_EXT ? base_byte_sign : 1'b0}}, base_byte_data};
@@ -143,7 +189,7 @@ always_comb begin
                 endcase
             end
             `MEM_UART: begin
-                case (addr[2:0])
+                case (mapped[2:0])
                     3'b101: cur_data_out = { 26'b0, uart_tbre && uart_tsre, 4'b0, uart_dataready }; // state
                     3'b000: cur_data_out = { 24'b0, base_ram_data[7:0] }; // data
                     default: begin end
@@ -154,51 +200,53 @@ always_comb begin
             `MEM_MTIMECMP_LO: cur_data_out = mtimecmp[31:0];
             `MEM_MTIMECMP_HI: cur_data_out = mtimecmp[63:32];
         endcase
-        default: begin 
-            // TODO: raise PAGE_FAULT
-        end
+        default: begin end
     endcase
 end
 
-assign done = next_state == S_RW_RAM ? 1'b1 : 1'b0;
+assign done = ((~page_enabled) && next_state == S_RW_RAM_M) || (page_enabled && next_state == S_IDLE_U);
 assign idle = (state == S_IDLE) ? 1'b1 : 1'b0;
 
 reg[3:0] done_be_n;
-// Try to accelerate R&W of memory to 1 cycle.
-reg[3:0] next_state;
 // This logic is only for idle / read_ram / write_ram
 always_comb begin
     ram_be_n = 4'b0000;
     ram_enable = IDLE;
-    cur_addr = { 12'b0, addr[21:2] };
+    cur_addr = { 12'b0, mapped[21:2] };
     cur_data_in = data_in;
-    next_state = S_DONE; // default, next state is DONE.
+    next_state = S_DONE_M; // default, next state is DONE.
+    page_status = PAGE_NORMAL;
     case (state)
-        S_IDLE, S_RW_RAM: begin
+        S_IDLE, S_RW_RAM_M, S_RW_RAM_U: begin
+            case (state)
+                S_IDLE: next_state = S_DONE_M;
+                S_RW_RAM_M: next_state = S_DONE_M;
+                S_RW_RAM_U: next_state = S_DONE_U;
+                default: begin end
+            endcase
             case (inst[3:2])
-                `MEM_READ: casez (addr)
+                `MEM_READ: casez (mapped)
                     `MEM_BASE: ram_enable = READ_BASE;
                     `MEM_EXT: ram_enable = READ_EXT;
                     `MEM_UART: begin
-                        case (addr[2:0])
-                            3'b101: next_state = S_DONE; // state
+                        case (mapped[2:0])
                             3'b000: next_state = S_READ_UART; // Please annotate this if using async uart
-                            default: next_state = S_DONE; // ignore other addresses except 0x10000000 and 0x10000005
+                            default: begin end
                         endcase
                     end
-                    `MEM_MTIME_LO, `MEM_MTIME_HI: next_state = S_DONE;
-                    `MEM_MTIMECMP_LO, `MEM_MTIMECMP_HI: next_state = S_DONE;
+                    `MEM_MTIME_LO, `MEM_MTIME_HI, `MEM_MTIMECMP_LO, `MEM_MTIMECMP_HI: begin end
+                    default: page_status = PAGE_FAULT_READ;
                 endcase
-                `MEM_WRITE: casez (addr)
+                `MEM_WRITE: casez (mapped)
                     `MEM_BASE, `MEM_EXT: begin
-                        casez (addr)
+                        casez (mapped)
                             `MEM_BASE: ram_enable = WRITE_BASE;
                             `MEM_EXT: ram_enable = WRITE_EXT;
                             default: begin end
                         endcase
                         case (inst[1:0]) 
                             `MEM_BYTE: begin
-                                case (addr[1:0])
+                                case (mapped[1:0])
                                     2'b00: begin
                                         ram_be_n = 4'b1110;
                                         cur_data_in = {24'b0, data_in[7:0]}; 
@@ -218,7 +266,7 @@ always_comb begin
                                 endcase         
                             end
                             `MEM_HALF: begin
-                                case (addr[1:0])
+                                case (mapped[1:0])
                                     2'b00: begin
                                         ram_be_n = 4'b1100;
                                         cur_data_in = {16'b0, data_in[15:0]};
@@ -234,20 +282,18 @@ always_comb begin
                         endcase
                     end
                     `MEM_UART: begin
-                        case (addr[2:0])
+                        case (mapped[2:0])
                             3'b000: begin
                                 ram_enable = WRITE_UART;
                                 next_state = S_WRITE_UART; // Please annotate this if using async uart
                             end
-                            default: next_state = S_DONE;
+                            default: begin end
                         endcase
                     end
-                    `MEM_MTIME_LO, `MEM_MTIME_HI: next_state = S_DONE;
-                    `MEM_MTIMECMP_LO, `MEM_MTIMECMP_HI: next_state = S_DONE;
+                    `MEM_MTIME_LO, `MEM_MTIME_HI, `MEM_MTIMECMP_LO, `MEM_MTIMECMP_HI: begin end
+                    default: page_status = PAGE_FAULT_WRITE;
                 endcase
-                default: begin
-                    next_state = S_DONE;        
-                end
+                default: begin end
             endcase
         end
         S_READ_UART: begin
@@ -263,7 +309,7 @@ always_comb begin
         end
         S_READ_UART_GAP_1: begin
             ram_enable = READ_UART;
-            next_state = S_DONE;
+            next_state = S_DONE_M;
         end
         S_WRITE_UART: begin
             ram_enable = WRITE_UART;
@@ -282,12 +328,39 @@ always_comb begin
             else next_state = S_WRITE_UART_WAIT_TSRE;
         end
         S_WRITE_UART_WAIT_TSRE_1: begin
-            next_state = S_DONE;
+            next_state = S_DONE_M;
         end
-        S_DONE: begin
+        S_DONE_M, S_DONE_U: begin
             ram_be_n = done_be_n;
             ram_enable = done_ram_enable;
-            next_state = S_RW_RAM;
+            page_status = done_page_status;
+            case (state)
+                S_DONE_M: next_state = page_enabled ? S_READ_L1_PAGE_TABLE : S_RW_RAM_M;
+                S_DONE_U: next_state = page_enabled ? S_IDLE_U : S_IDLE;
+                default: begin end
+            endcase
+        end
+        S_IDLE_U, S_READ_L1_PAGE_TABLE, S_READ_L1_PAGE_TABLE_1, S_READ_L2_PAGE_TABLE, S_READ_L2_PAGE_TABLE_1: begin
+            case (state)
+                S_IDLE_U: next_state = S_READ_L1_PAGE_TABLE;
+                S_READ_L1_PAGE_TABLE: next_state = S_READ_L1_PAGE_TABLE_1;
+                S_READ_L1_PAGE_TABLE_1: next_state = S_READ_L2_PAGE_TABLE;
+                S_READ_L2_PAGE_TABLE: next_state = S_READ_L2_PAGE_TABLE_1;
+                S_READ_L2_PAGE_TABLE_1: next_state = S_RW_RAM_U;
+                default: next_state = S_DONE_U;
+            endcase
+            casez (page_addr)
+                `MEM_BASE: ram_enable = READ_BASE;
+                `MEM_EXT: ram_enable = READ_EXT;
+                default: begin
+                    case (inst[3:2])
+                        `MEM_READ: page_status = PAGE_FAULT_READ;
+                        `MEM_WRITE: page_status = PAGE_FAULT_WRITE;
+                        default: page_status = PAGE_NORMAL;
+                    endcase
+                    next_state = S_DONE_U;
+                end
+            endcase
         end
         default: next_state = S_IDLE;
     endcase
@@ -300,13 +373,14 @@ always_ff @(posedge clk or posedge rst) begin
         mtimecmp <= 64'hFFFFFFFF;
     end else begin
         state <= next_state;
-        if (next_state == S_DONE) begin
+        if (next_state == S_DONE_M || next_state == S_DONE_U) begin
             done_ram_enable <= ram_enable;
             done_be_n <= ram_be_n;
+            done_page_status = page_status;
         end
-        else done_ram_enable <= IDLE;
+
         if (inst[3:2] == `MEM_WRITE) begin
-            casez (addr)
+            casez (mapped)
                 `MEM_MTIME_LO: mtime <= { mtime[63:32], cur_data_in };
                 `MEM_MTIME_HI: mtime <= { cur_data_in, mtime[31:0] };
                 `MEM_MTIMECMP_LO: mtimecmp <= { mtimecmp[63:32], cur_data_in };
@@ -315,6 +389,19 @@ always_ff @(posedge clk or posedge rst) begin
         end else begin
             mtime <= mtime + 1;
         end
+
+        // page data
+        case (next_state)
+            S_READ_L2_PAGE_TABLE, S_RW_RAM_U: begin
+                casez (page_addr)
+                    `MEM_BASE: page_table_data <= base_ram_data;
+                    `MEM_EXT: page_table_data <= ext_ram_data;
+                    default: page_table_data <= 32'h0;
+                endcase
+            end
+            default: begin end
+        endcase
+        
     end
 end
 
