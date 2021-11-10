@@ -52,10 +52,12 @@ always_comb begin
             jump_pc_reg = pc + {sign_ext[10:0], inst[31], inst[19:12], inst[20], inst[30:21], 1'b0}; // pc + imm
             pc_jumping = 1;
         end
+        /*
         7'b1100111: begin // I assume that the reg val is correct (I don't believe there will be much collision in jalr)
             jump_pc_reg = reg_s_val + {sign_ext, inst[31:20]};
             pc_jumping = 1;
         end
+        */
         default: begin end
     endcase
     // check if legal
