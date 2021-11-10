@@ -154,16 +154,30 @@ module decoder(
                     12'b001101000011: csr_reg = `CSR_MTVAL;
                     12'b001101000000: csr_reg = `CSR_MSCRATCH;
                     12'b001100000000: csr_reg = `CSR_MSTATUS;
+                    12'b000110000000: csr_reg = `CSR_SATP;
+                    12'b001100000011: csr_reg = `CSR_MIDELEG;
+                    12'b001100000010: csr_reg = `CSR_MEDELEG;
+                    12'b000100000000: csr_reg = `CSR_SSTATUS;
+                    12'b000101000001: csr_reg = `CSR_SEPC;
+                    12'b000101000010: csr_reg = `CSR_SCAUSE;
+                    12'b000101000011: csr_reg = `CSR_STVAL;
+                    12'b000100000101: csr_reg = `CSR_STVEC;
+                    12'b000101000000: csr_reg = `CSR_SSCRATCH;
+                    12'b000100000100: csr_reg = `CSR_SIE;
+                    12'b000101000100: csr_reg = `CSR_SIP;
+                    12'b110000000001: csr_reg = `CSR_MTIME;
+                    12'b110010000001: csr_reg = `CSR_MTIMEH;
                     default: csr_reg = `CSR_ZERO;
                 endcase
                 case (inst[14:12])
                     3'b011: op = `OP_CSRRC;
                     3'b010: op = `OP_CSRRS;
                     3'b001: op = `OP_CSRRW;
-                    3'b000: case (inst[31:7])
+                    3'b000: casez (inst[31:7])
                         25'b0000000000010000000000000: op = `OP_EBREAK;
                         25'b0000000000000000000000000: op = `OP_ECALL;
                         25'b0011000000100000000000000: op = `OP_MRET;
+                        25'b0001001??????????00000000: op = `OP_SFENCE_VMA; // nop
                         default: begin end
                     endcase
                     default: begin end

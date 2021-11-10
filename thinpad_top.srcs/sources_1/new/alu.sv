@@ -94,7 +94,7 @@ module alu(
             `PCNT: begin
                 result = 0;
                 foreach(a[idx]) begin  // comb
-                    result += a[idx];
+                    result += {31'b0, a[idx]};
                 end
             end
             `SBCLR: result = a & (~(1 << b[4:0]));
