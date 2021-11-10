@@ -5,6 +5,7 @@
 module branch_pred (
     input wire clk,
     input wire mem_done,
+    input wire[1:0] mem_occupied_by,
     input wire is_jump_op,
     input wire[2:0] last_jump_pc, // 4 to 2
     input wire last_jump_result,
@@ -14,6 +15,8 @@ module branch_pred (
     output wire[4:0] reg_s,
     output wire[31:0] pred_pc
 );
+
+localparam MEM_IF = 1;
 
 // history, I don't need to reset it
 reg[7:0][2:0] history_results = {8{3'b0}};
@@ -66,7 +69,7 @@ always_comb begin
 end
 
 always_ff @(posedge clk) begin
-    if (mem_done && is_jump_op) begin
+    if (mem_done && mem_occupied_by == MEM_IF && is_jump_op) begin
        history_results[last_jump_pc] <= { history_results[last_jump_pc][1:0], last_jump_result };
     end
 end

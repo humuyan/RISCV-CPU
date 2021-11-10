@@ -268,6 +268,7 @@ reg[31:0] id_exe_pred_pc, exe_mem_pred_pc;
 branch_pred _branch_pred(
     .clk(clk_50M),
     .mem_done(mem_done),
+    .mem_occupied_by(mem_occupied_by),
     .is_jump_op(is_jump_op),
     .last_jump_pc(exe_mem_pc[4:2]),
     .last_jump_result(pc_jumping),
