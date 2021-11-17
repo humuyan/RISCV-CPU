@@ -4,14 +4,11 @@
 `define CSR_MCAUSE 5'h3
 // sie == mie, sip == mip
 `define CSR_MIE 5'h4
-`define CSR_SIE 5'h4
 `define CSR_MIP 5'h5
-`define CSR_SIP 5'h5
 `define CSR_MTVAL 5'h6
 `define CSR_MSCRATCH 5'h7
 // sstatus == mstatus
 `define CSR_MSTATUS 5'h8
-`define CSR_SSTATUS 5'h8
 `define CSR_SATP 5'h9
 `define CSR_MIDELEG 5'hA
 `define CSR_MEDELEG 5'hB
@@ -20,6 +17,10 @@
 `define CSR_SCAUSE 5'hE
 `define CSR_STVAL 5'hF
 `define CSR_SSCRATCH 5'h10
+
+`define CSR_SIE 5'h11
+`define CSR_SIP 5'h12
+`define CSR_SSTATUS 5'h13
 
 `define CSR_MTIME 5'h1E
 `define CSR_MTIMEH 5'h1F

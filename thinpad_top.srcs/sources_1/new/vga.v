@@ -1,4 +1,4 @@
-`timescale 1ns / 1ps
+`timescale 1ns / 1ns
 //
 // WIDTH: bits in register hdata & vdata
 // HSIZE: horizontal size of visible field 

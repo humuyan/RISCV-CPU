@@ -44,7 +44,6 @@ module mem (
 
 typedef enum reg[1:0] { USER, SUPERVISOR, MACHINE } mode_t;
 
-reg[8:0] done_ram_enable;
 reg[8:0] ram_enable;
 reg[31:0] cur_addr;
 reg[31:0] cur_data_in;
@@ -74,6 +73,8 @@ assign ext_ram_be_n = ram_be_n;
 typedef enum reg[4:0] {
     S_IDLE,
     S_RW_RAM_U,
+    S_RW_RAM_SUPERPAGE,
+    S_DONE_SUPERPAGE,
     S_RW_RAM_M,
     S_READ_UART,
     S_WRITE_UART,
@@ -85,6 +86,7 @@ typedef enum reg[4:0] {
     S_WRITE_UART_WAIT_TSRE_1,
     S_DONE_U,
     S_DONE_M,
+    S_DONE_UART,
     S_IDLE_U,
     S_READ_L1_PAGE_TABLE,
     S_READ_L1_PAGE_TABLE_1,
@@ -133,7 +135,7 @@ wire[15:0] ext_half_data;
 assign ext_half_data = mapped[1:0] == 2'b00 ? ext_ram_data[15:0] : ext_ram_data[31:16];
 
 typedef enum reg[1:0] { PAGE_NORMAL, PAGE_FAULT_READ, PAGE_FAULT_WRITE } page_status_t;
-page_status_t page_status, done_page_status;
+page_status_t page_status;
 assign mtip = mtime >= mtimecmp;
 
 localparam MEM_NONE = 0;
@@ -164,7 +166,17 @@ always_comb begin
         S_IDLE_U, S_READ_L1_PAGE_TABLE, S_READ_L1_PAGE_TABLE_1: page_addr = {`SATP_PPN, addr[31:22], 2'b0};
         S_READ_L2_PAGE_TABLE, S_READ_L2_PAGE_TABLE_1: page_addr = {`PTE_PPN, addr[21:12], 2'b0}; 
         S_RW_RAM_U, S_DONE_U: page_addr = {`PTE_PPN, addr[11:0]};
+        S_RW_RAM_SUPERPAGE, S_DONE_SUPERPAGE: page_addr = {page_table_data[31:22], addr[21:0]};
         default: page_addr = 32'h0;
+    endcase
+end
+
+reg[31:0] next_page_table_data;
+always_comb begin
+    casez (page_addr)
+        `MEM_BASE: next_page_table_data = base_ram_data;
+        `MEM_EXT: next_page_table_data = ext_ram_data;
+        default: next_page_table_data = 32'h0;
     endcase
 end
 
@@ -207,7 +219,6 @@ end
 assign done = ((~page_enabled) && next_state == S_RW_RAM_M) || (page_enabled && next_state == S_IDLE_U);
 assign idle = (state == S_IDLE) ? 1'b1 : 1'b0;
 
-reg[3:0] done_be_n;
 // This logic is only for idle / read_ram / write_ram
 always_comb begin
     ram_be_n = 4'b0000;
@@ -217,11 +228,12 @@ always_comb begin
     next_state = S_DONE_M; // default, next state is DONE.
     page_status = PAGE_NORMAL;
     case (state)
-        S_IDLE, S_RW_RAM_M, S_RW_RAM_U: begin
+        S_IDLE, S_RW_RAM_M, S_RW_RAM_U, S_RW_RAM_SUPERPAGE, S_DONE_M, S_DONE_U, S_DONE_SUPERPAGE: begin
             case (state)
                 S_IDLE: next_state = S_DONE_M;
                 S_RW_RAM_M: next_state = S_DONE_M;
                 S_RW_RAM_U: next_state = S_DONE_U;
+                S_RW_RAM_SUPERPAGE: next_state = S_DONE_SUPERPAGE;
                 default: begin end
             endcase
             case (inst[3:2])
@@ -295,6 +307,11 @@ always_comb begin
                 endcase
                 default: begin end
             endcase
+            case (state)
+                S_DONE_M: next_state = page_enabled ? S_READ_L1_PAGE_TABLE : S_RW_RAM_M;
+                S_DONE_U, S_DONE_SUPERPAGE: next_state = page_enabled ? S_IDLE_U : S_IDLE;
+                default: begin end
+            endcase
         end
         S_READ_UART: begin
             if (uart_dataready == 1) begin
@@ -309,7 +326,7 @@ always_comb begin
         end
         S_READ_UART_GAP_1: begin
             ram_enable = READ_UART;
-            next_state = S_DONE_M;
+            next_state = S_DONE_UART;
         end
         S_WRITE_UART: begin
             ram_enable = WRITE_UART;
@@ -328,23 +345,22 @@ always_comb begin
             else next_state = S_WRITE_UART_WAIT_TSRE;
         end
         S_WRITE_UART_WAIT_TSRE_1: begin
-            next_state = S_DONE_M;
+            next_state = S_DONE_UART;
         end
-        S_DONE_M, S_DONE_U: begin
-            ram_be_n = done_be_n;
-            ram_enable = done_ram_enable;
-            page_status = done_page_status;
-            case (state)
-                S_DONE_M: next_state = page_enabled ? S_READ_L1_PAGE_TABLE : S_RW_RAM_M;
-                S_DONE_U: next_state = page_enabled ? S_IDLE_U : S_IDLE;
-                default: begin end
-            endcase
+        S_DONE_UART: begin
+            next_state = page_enabled ? S_READ_L1_PAGE_TABLE : S_RW_RAM_M;
         end
         S_IDLE_U, S_READ_L1_PAGE_TABLE, S_READ_L1_PAGE_TABLE_1, S_READ_L2_PAGE_TABLE, S_READ_L2_PAGE_TABLE_1: begin
             case (state)
                 S_IDLE_U: next_state = S_READ_L1_PAGE_TABLE;
                 S_READ_L1_PAGE_TABLE: next_state = S_READ_L1_PAGE_TABLE_1;
-                S_READ_L1_PAGE_TABLE_1: next_state = S_READ_L2_PAGE_TABLE;
+                S_READ_L1_PAGE_TABLE_1: begin
+                    if (next_page_table_data[3] || next_page_table_data[1]) begin // R or X
+                        next_state = S_RW_RAM_SUPERPAGE;
+                    end else begin
+                       next_state = S_READ_L2_PAGE_TABLE; 
+                    end
+                end
                 S_READ_L2_PAGE_TABLE: next_state = S_READ_L2_PAGE_TABLE_1;
                 S_READ_L2_PAGE_TABLE_1: next_state = S_RW_RAM_U;
                 default: next_state = S_DONE_U;
@@ -373,12 +389,6 @@ always_ff @(posedge clk or posedge rst) begin
         mtimecmp <= 64'hFFFFFFFF;
     end else begin
         state <= next_state;
-        if (next_state == S_DONE_M || next_state == S_DONE_U) begin
-            done_ram_enable <= ram_enable;
-            done_be_n <= ram_be_n;
-            done_page_status = page_status;
-        end
-
         if (inst[3:2] == `MEM_WRITE) begin
             casez (mapped)
                 `MEM_MTIME_LO: mtime <= { mtime[63:32], cur_data_in };
@@ -386,18 +396,14 @@ always_ff @(posedge clk or posedge rst) begin
                 `MEM_MTIMECMP_LO: mtimecmp <= { mtimecmp[63:32], cur_data_in };
                 `MEM_MTIMECMP_HI: mtimecmp <= { cur_data_in, mtimecmp[31:0] };
             endcase
-        end else begin
+        end else if (done) begin
             mtime <= mtime + 1;
         end
 
         // page data
         case (next_state)
-            S_READ_L2_PAGE_TABLE, S_RW_RAM_U: begin
-                casez (page_addr)
-                    `MEM_BASE: page_table_data <= base_ram_data;
-                    `MEM_EXT: page_table_data <= ext_ram_data;
-                    default: page_table_data <= 32'h0;
-                endcase
+            S_READ_L2_PAGE_TABLE, S_RW_RAM_U, S_RW_RAM_SUPERPAGE: begin
+                page_table_data <= next_page_table_data;
             end
             default: begin end
         endcase
