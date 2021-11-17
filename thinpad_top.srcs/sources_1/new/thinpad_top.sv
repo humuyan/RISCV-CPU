@@ -163,6 +163,7 @@ wire imm_select;
 
 decoder _decoder(
     .inst(reg_inst),
+    .mode(mode),
     .reg_s(reg_s),
     .reg_t(reg_t),
     .reg_d(reg_d),
@@ -206,7 +207,7 @@ wire[3:0] exe_flags;
 // alu
 always_comb begin
     case (exe_mem_op)
-        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SH, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_BLT, `OP_BLTU, `OP_BGE, `OP_BGEU: alu_op = `ADD;
+        `OP_ADD, `OP_ADDI, `OP_AUIPC, `OP_BEQ, `OP_BNE, `OP_SB, `OP_SW, `OP_LUI, `OP_JAL, `OP_JALR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SH, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_CSRRCI, `OP_CSRRSI, `OP_CSRRWI,  `OP_BLT, `OP_BLTU, `OP_BGE, `OP_BGEU: alu_op = `ADD;
         `OP_AND, `OP_ANDI: alu_op = `AND;
         `OP_OR, `OP_ORI: alu_op = `OR;
         `OP_CLZ: alu_op = `CLZ;
@@ -238,7 +239,7 @@ always_comb begin
                 `OP_BEQ: pc_jumping = (raw_exe_reg_s_val == raw_exe_reg_t_val);
                 `OP_BNE: pc_jumping = (raw_exe_reg_s_val != raw_exe_reg_t_val);
                 `OP_BLT: pc_jumping = ($signed(raw_exe_reg_s_val) < $signed(raw_exe_reg_t_val));
-                `OP_BGE: pc_jumping = ($signed(raw_exe_reg_t_val) >= $signed(raw_exe_reg_t_val));
+                `OP_BGE: pc_jumping = ($signed(raw_exe_reg_s_val) >= $signed(raw_exe_reg_t_val));
                 `OP_BLTU: pc_jumping = (raw_exe_reg_s_val < raw_exe_reg_t_val);
                 `OP_BGEU: pc_jumping = (raw_exe_reg_s_val >= raw_exe_reg_t_val);
                 default: pc_jumping = 1'b0;
@@ -258,8 +259,8 @@ end
 wire[4:0] reg_pred_s;
 wire[31:0] reg_pred_s_data;
 wire[31:0] raw_reg_pred_s_data;
-assign raw_reg_pred_s_data = (wb_reg_d == reg_pred_s && wb_reg_d != 5'b0) ? wb_exe_result : 
-                            ((mem_reg_d == reg_pred_s && mem_reg_d != 5'b0) ? mem_exe_result :
+assign raw_reg_pred_s_data = (wb_reg_d == reg_pred_s && wb_reg_d != 5'b0) ? real_wb_result : 
+                            ((mem_reg_d == reg_pred_s && mem_reg_d != 5'b0) ? real_mem_result:
                              (exe_reg_d == reg_pred_s && exe_reg_d != 5'b0) ? exe_result : reg_pred_s_data);
 wire[31:0] pred_pc;
 
@@ -299,7 +300,7 @@ always_comb begin
                 endcase
             end
             `OP_SB, `OP_SW, `OP_SH: begin
-                mem_data_in = (wb_reg_d == mem_reg_t && wb_reg_d != 5'b0) ? wb_exe_result : mem_exe_reg_t_val;
+                mem_data_in = (wb_reg_d == mem_reg_t && wb_reg_d != 5'b0) ? real_wb_result : mem_exe_reg_t_val;
                 mem_addr = mem_exe_result;
                 case (mem_wb_op)
                     `OP_SB: mem_inst = `MEM_WRITE_BYTE;
@@ -320,57 +321,62 @@ end
 
 // wb
 always_comb begin
-    case (mem_wb_op)
-        `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SLTU, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_SLTIU, `OP_XORI, `OP_SRA, `OP_SRAI, `OP_SUB, `OP_SLL, `OP_SRL, `OP_CLZ, `OP_PCNT, `OP_SBCLR, `OP_SLT, `OP_SLTI: begin
-            reg_waddr = mem_reg_d;
-            reg_wdata = mem_exe_result;
-            reg_we = 1'b1;
-        end
-        `OP_JAL, `OP_JALR: begin
-            reg_waddr = mem_reg_d;
-            reg_wdata = mem_wb_pc + 32'h4;
-            reg_we = 1'b1;
-        end
-        default: begin
-            reg_waddr = 5'b0;
-            reg_wdata = 32'b0;
-            reg_we = 1'b0;
-        end
-    endcase
+    reg_waddr = 5'b0;
+    reg_wdata = 32'b0;
+    reg_we = 1'b0;
+    if (~wb_nop) begin // when exception, current instruction shouldn't be WB.
+        case (mem_wb_op)
+            `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SLTU, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_CSRRCI, `OP_CSRRSI, `OP_CSRRWI, `OP_SLTIU, `OP_XORI, `OP_SRA, `OP_SRAI, `OP_SUB, `OP_SLL, `OP_SRL, `OP_CLZ, `OP_PCNT, `OP_SBCLR, `OP_SLT, `OP_SLTI: begin
+                reg_waddr = mem_reg_d;
+                reg_wdata = mem_exe_result;
+                reg_we = 1'b1;
+            end
+            `OP_JAL, `OP_JALR: begin
+                reg_waddr = mem_reg_d;
+                reg_wdata = mem_wb_pc + 32'h4;
+                reg_we = 1'b1;
+            end
+            default: begin end
+        endcase
+    end
+    
 end
 
+// result to be WB
+wire[31:0] real_mem_result;
+assign real_mem_result = (mem_wb_op == `OP_JAL || mem_wb_op == `OP_JALR) ? mem_wb_pc + 32'h4 : mem_exe_result;
 wire[31:0] raw_exe_reg_s_val, raw_exe_reg_t_val;
-assign raw_exe_reg_s_val = ((mem_reg_d == exe_reg_s && mem_reg_d != 5'b0) ? mem_exe_result : exe_reg_s_val);
-assign raw_exe_reg_t_val = ((mem_reg_d == exe_reg_t && mem_reg_d != 5'b0) ? mem_exe_result : exe_reg_t_val);
+assign raw_exe_reg_s_val = ((mem_reg_d == exe_reg_s && mem_reg_d != 5'b0) ? real_mem_result : exe_reg_s_val);
+assign raw_exe_reg_t_val = ((mem_reg_d == exe_reg_t && mem_reg_d != 5'b0) ? real_mem_result : exe_reg_t_val);
 
 wire exe_is_csr_op;
-assign exe_is_csr_op = (exe_mem_op == `OP_CSRRC || exe_mem_op == `OP_CSRRS || exe_mem_op == `OP_CSRRW);
+assign exe_is_csr_op = (exe_mem_op == `OP_CSRRC || exe_mem_op == `OP_CSRRS || exe_mem_op == `OP_CSRRW || exe_mem_op == `OP_CSRRCI || exe_mem_op == `OP_CSRRSI || exe_mem_op == `OP_CSRRWI);
 wire exe_is_branch_op;
 assign exe_is_branch_op = (exe_mem_op == `OP_BEQ || exe_mem_op == `OP_BNE || exe_mem_op == `OP_AUIPC || exe_mem_op == `OP_JAL || exe_mem_op == `OP_BLT || exe_mem_op == `OP_BLTU || exe_mem_op == `OP_BGE || exe_mem_op == `OP_BGEU);
 alu _alu(
     .op(alu_op),
     .a(exe_is_branch_op ? exe_mem_pc : (exe_is_csr_op ? 32'b0 : raw_exe_reg_s_val)), // csr op needs all zero to get csr value
     .b(exe_imm_select ? exe_imm : 
-       (exe_is_csr_op && csr_waddr == exe_reg_t && csr_waddr != 5'b0 ? csr_wdata : raw_exe_reg_t_val)), // csr is moved to EXE so I need to handle data dependency
+       (exe_is_csr_op ? csr_val : raw_exe_reg_t_val)), // no need to handle data dependency for it is atomic
     .r(exe_result),
     .flags(exe_flags)
 );
 
 reg[3:0] id_exception, exe_exception, mem_exception;
+reg[31:0] id_exception_tval, exe_exception_tval, mem_exception_tval;
 wire[3:0] id_raising_exception, mem_raising_exception;
-reg[3:0] cur_exception;
-reg[31:0] cur_exception_pc;
+wire[3:0] cur_exception;
+wire[31:0] cur_exception_pc;
+wire[31:0] cur_exception_tval;
 
-always_comb begin
-    cur_exception_pc = mem_wb_pc;
-    if (mem_exception != `EXCEPT_NONE) begin
-        cur_exception = mem_exception;
-    end else begin
-        cur_exception = `EXCEPT_NONE;
-    end
-end
+wire[3:0] if_exception;
+assign if_exception = mem_raising_exception != `EXCEPT_NONE ? mem_raising_exception : timeout_exception;
 
-wire[31:0] mtvec, mepc, satp, csr_val;
+assign cur_exception = mem_exception;
+assign cur_exception_pc = mem_wb_pc;
+assign cur_exception_tval = mem_exception_tval;
+
+wire[31:0] mtvec, mepc, stvec, sepc, satp, csr_val;
 wire is_pending_exception, mtip;
 reg csr_we;
 reg[4:0] csr_waddr;
@@ -382,20 +388,18 @@ wire[1:0] mode;
 
 always_comb begin
     case (exe_mem_op)
-        `OP_CSRRC: begin
+        `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_CSRRCI, `OP_CSRRSI, `OP_CSRRWI: begin
             csr_we = 1'h1;
             csr_waddr = exe_reg_t;
-            csr_wdata = csr_val & raw_exe_reg_s_val;
-        end
-        `OP_CSRRS: begin
-            csr_we = 1'h1;
-            csr_waddr = exe_reg_t;
-            csr_wdata = csr_val | raw_exe_reg_s_val;
-        end
-        `OP_CSRRW: begin
-            csr_we = 1'h1;
-            csr_waddr = exe_reg_t;
-            csr_wdata = raw_exe_reg_s_val;
+            case (exe_mem_op)
+                `OP_CSRRC: csr_wdata = csr_val & (~raw_exe_reg_s_val);
+                `OP_CSRRS: csr_wdata = csr_val | raw_exe_reg_s_val;
+                `OP_CSRRW: csr_wdata = raw_exe_reg_s_val;
+                `OP_CSRRCI: csr_wdata = csr_val & (~{ 27'h0, exe_reg_s });
+                `OP_CSRRSI: csr_wdata = csr_val | { 27'h0, exe_reg_s };
+                `OP_CSRRWI: csr_wdata = { 27'h0, exe_reg_s };
+                default: csr_wdata = 32'h0;
+            endcase
         end
         default: begin
             csr_we = 1'h0;
@@ -404,6 +408,9 @@ always_comb begin
         end
     endcase
 end
+
+wire exception_handle_by_s;
+wire[3:0] timeout_exception;
 exception_handler _exception_handler(
     .clk(clk_50M),
     .rst(reset_btn),
@@ -415,16 +422,21 @@ exception_handler _exception_handler(
     .raddr(exe_reg_t),
     .cur_exception(cur_exception),
     .cur_exception_pc(cur_exception_pc),
+    .tval(cur_exception_tval),
     .mtime(mtime),
     .mtvec(mtvec),
     .mepc(mepc),
+    .stvec(stvec),
+    .sepc(sepc),
     .satp(satp),
     .rdata(csr_val),
     .mtip(mtip),
     .mode_out(mode),
     .pipeline_empty(pipeline_empty),
     .is_pending_exception(is_pending_exception),
-    .pending_exception_out(pending_exception)
+    .pending_exception_out(pending_exception),
+    .exception_handle_by_s(exception_handle_by_s),
+    .timeout_exception(timeout_exception)
 );
 
 wire is_csr_op;
@@ -441,7 +453,7 @@ reg[4:0] exe_reg_s, exe_reg_t;
 reg[31:0] mem_exe_reg_s_val, mem_exe_reg_t_val;
 reg[31:0] mem_exe_result;
 reg[4:0] mem_reg_s, mem_reg_t, mem_reg_d;
-reg[31:0] wb_exe_result;
+reg[31:0] real_wb_result;
 reg[4:0] wb_reg_s, wb_reg_t, wb_reg_d;
 
 localparam INST_INVALID = 32'b0;
@@ -453,7 +465,7 @@ assign pipeline_empty = (mem_wb_op == `OP_INVALID) && (exe_mem_op == `OP_INVALID
 wire pred_wrong;
 assign pred_wrong = is_jump_op && (next_pc != exe_mem_pred_pc);
 
-wire next_if_nop, next_id_nop, next_exe_nop, next_mem_nop;
+wire next_if_nop, next_id_nop, next_exe_nop, next_mem_nop, wb_nop;
 // for delayed exception handling, all the exceptions will be handled in MEM state.
 // next PC is 32'h0 (no need to fetch)
 assign next_if_nop = (is_pending_exception && (!pipeline_empty)) || cur_exception != `EXCEPT_NONE;
@@ -463,10 +475,16 @@ assign next_id_nop = (is_pending_exception) || cur_exception != `EXCEPT_NONE || 
 assign next_exe_nop = cur_exception != `EXCEPT_NONE || pred_wrong;
 // kill cur EXE
 assign next_mem_nop = cur_exception != `EXCEPT_NONE;
+// we can't write back wrong data here.
+assign wb_nop = cur_exception != `EXCEPT_NONE;
 
 wire pipeline_flow;
 assign pipeline_flow = (mem_occupied_by == MEM_IF) || (cur_exception != `EXCEPT_NONE); // halt current IF is OK (if exception happens, we don't need to fetch new instruction.)
 
+wire is_page_fault;
+assign is_page_fault = mem_raising_exception == `EXCEPT_INST_PAGE_FAULT || 
+                       mem_raising_exception == `EXCEPT_LOAD_PAGE_FAULT || 
+                       mem_raising_exception == `EXCEPT_STORE_PAGE_FAULT;
 
 always_ff @(posedge clk_50M or posedge reset_btn) begin
     if (reset_btn) begin
@@ -486,7 +504,14 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                     if (is_pending_exception && pipeline_empty) begin
                         case (pending_exception)
                             `EXCEPT_MRET: pc <= mepc;
-                            default: pc <= mtvec;
+                            `EXCEPT_SRET: pc <= sepc;
+                            default: begin
+                                if (exception_handle_by_s) begin
+                                    pc <= stvec;
+                                end else begin
+                                    pc <= mtvec;
+                                end
+                            end
                         endcase                    
                     end else if (pred_wrong) begin
                         pc <= next_pc;
@@ -499,15 +524,17 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                     reg_inst <= INST_INVALID;
                     id_exe_pc <= 32'h0;
                     id_exception <= `EXCEPT_NONE;
+                    id_exception_tval <= 32'h0;
                 end else begin
                     reg_inst <= mem_data_out;
                     id_exe_pc <= pc;
-                    id_exception <= mem_raising_exception; // currently in IF (page fault...)
+                    id_exception <= if_exception; // currently in IF (page fault and timeout (delayed as well))
+                    id_exception_tval <= is_page_fault ? mem_addr : 32'h0;
                 end
 
                 if (next_exe_nop) begin
-                    exe_mem_op <= `OP_INVALID;
                     exe_mem_pc <= 32'h0;
+                    exe_mem_op <= `OP_INVALID;
                     exe_reg_s_val <= 0;
                     exe_reg_t_val <= 0;
                     exe_reg_s <= 0;
@@ -516,9 +543,10 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                     exe_imm <= 0;
                     exe_imm_select <= 0;
                     exe_exception <= `EXCEPT_NONE;
+                    exe_exception_tval <= 32'h0;
                 end else begin
-                    exe_mem_op <= id_exe_op;
                     exe_mem_pc <= id_exe_pc;
+                    exe_mem_op <= id_exe_op;
                     exe_reg_s_val <= id_reg_s_val;
                     exe_reg_t_val <= id_reg_t_val;
                     exe_reg_s <= reg_s;
@@ -527,11 +555,12 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                     exe_imm <= imm;
                     exe_imm_select <= imm_select;
                     exe_exception <= (id_exception != `EXCEPT_NONE) ? id_exception : id_raising_exception;
+                    exe_exception_tval <= id_exception_tval; // id can't trigger page fault (TODO: illegal inst)
                 end
 
                 if (next_mem_nop) begin
-                    mem_wb_op <= `OP_INVALID;
                     mem_wb_pc <= 32'h0;
+                    mem_wb_op <= `OP_INVALID;
                     mem_exe_reg_s_val <= 0;
                     mem_exe_reg_t_val <= 0;
                     mem_reg_s <= 0;
@@ -539,6 +568,7 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                     mem_reg_d <= 0;
                     mem_occupied_by <= MEM_IF;
                     mem_exception <= `EXCEPT_NONE;
+                    mem_exception_tval <= 32'h0;
                 end else begin
                     mem_wb_pc <= exe_mem_pc;
                     mem_wb_op <= exe_mem_op;
@@ -557,16 +587,21 @@ always_ff @(posedge clk_50M or posedge reset_btn) begin
                         endcase
                     end
                     mem_exception <= exe_exception; // mem_exception will be handled in else branch
+                    mem_exception_tval <= exe_exception_tval;
                 end
                 
-                wb_exe_result <= mem_exe_result;
+                // this is because data to be WB could be not exe data (may be pc + 4)
+                real_wb_result <= real_mem_result;
                 wb_reg_s <= mem_reg_s;
                 wb_reg_t <= mem_reg_t;
-                wb_reg_d <= mem_reg_d;  
+                wb_reg_d <= mem_reg_d; 
             end else begin // occupied by mem, no need to flow the pipeline
                 mem_occupied_by <= MEM_IF;
                 mem_exe_result <= mem_data_out; // save it in case it changes
-                mem_exception <= mem_raising_exception;
+                if (is_page_fault) begin // exception triggered in MEM state must be page fault.
+                    mem_exception <= mem_raising_exception;
+                    mem_exception_tval <= mem_addr;
+                end
             end
         end else begin end
     end

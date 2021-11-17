@@ -49,9 +49,9 @@ module alu(
             `OR: result = a | b;
             `XOR: result = a ^ b;
             `NOT: result = ~a;
-            `SLL: result = a << b;
-            `SRL: result = a >> b;
-            `SRA: result = $signed(a) >>> b;                
+            `SLL: result = a << b[4:0];
+            `SRL: result = a >> b[4:0];
+            `SRA: result = $signed(a) >>> b[4:0];                
             `ROL: result = (a << b) | (a >> (32 - b)); 
             `CLZ: begin  // vivado will optimize this code in the synthesis phase
                 casez(a)

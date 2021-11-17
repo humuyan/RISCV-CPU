@@ -5,9 +5,10 @@
 
 module decoder(
     input wire[31:0]        inst,
-    output wire[4:0]        reg_s,
-    output wire[4:0]        reg_t, // reg_t or csr reg
-    output wire[4:0]        reg_d,
+    input wire[1:0]         mode,
+    output reg[4:0]         reg_s,
+    output reg[4:0]         reg_t, // reg_t or csr reg
+    output reg[4:0]         reg_d,
     output reg[5:0]         op,
     output reg[31:0]        imm,
     output reg              imm_select,
@@ -18,10 +19,25 @@ module decoder(
     wire[19:0] sign_ext;
     assign sign = inst[31];
     assign sign_ext = {20{sign}};
-    assign reg_d = inst[11:7];
-    assign reg_s = (inst[6:0] == 7'b0110111) ? 5'b00000 : inst[19:15]; // lui should have zero as s1
-    assign reg_t = (inst[6:0] == 7'b1110011) ? csr_reg : inst[24:20]; // csr_reg will replace reg_t at CSR instructions
     reg[4:0] csr_reg;
+    typedef enum reg[1:0] { USER, SUPERVISOR, MACHINE } mode_t;
+
+    always_comb begin
+        reg_s = inst[19:15];
+        reg_t = inst[24:20];
+        reg_d = inst[11:7];
+        case (inst[6:0])
+            7'b0110011: begin end // R type
+            7'b0010011, 7'b0000011, 7'b1100111: reg_t = 5'h0; // I type, I type (load) and I type (jalr)
+            7'b0100011, 7'b1100011: reg_d = 5'h0; // S type and B type
+            7'b0110111, 7'b0010111, 7'b1101111: begin // U type and J type
+                reg_s = 5'h0;
+                reg_t = 5'h0;
+            end
+            7'b1110011: reg_t = csr_reg; // csr
+            default: begin end
+        endcase
+    end
 
     always_comb begin
         if (op == `OP_INVALID && inst != 32'h0) begin
@@ -29,9 +45,14 @@ module decoder(
         end else begin
             cur_exception = `EXCEPT_NONE;
             case (op)
-                `OP_ECALL: cur_exception = `EXCEPT_U_ECALL;
+                `OP_ECALL: case (mode)
+                    USER: cur_exception = `EXCEPT_U_ECALL;
+                    SUPERVISOR: cur_exception = `EXCEPT_S_ECALL;
+                    default: begin end
+                endcase
                 `OP_EBREAK: cur_exception = `EXCEPT_EBREAK;
                 `OP_MRET: cur_exception = `EXCEPT_MRET;
+                `OP_SRET: cur_exception = `EXCEPT_SRET;
                 default: begin end
             endcase
         end
@@ -72,8 +93,10 @@ module decoder(
                     3'b110: op = `OP_ORI;
                     3'b111: op = `OP_ANDI;
                     3'b001: begin
-                        if (inst[31:25] == 7'b0000000) op = `OP_SLLI;
-                        else if (inst[31:25] == 7'b0110000) begin
+                        if (inst[31:25] == 7'b0000000) begin
+                            op = `OP_SLLI;
+                            imm = {27'b0, inst[24:20]};
+                        end else if (inst[31:25] == 7'b0110000) begin
                             if (inst[24:20] == 5'b00000) op = `OP_CLZ;
                             else if(inst[24:20] == 5'b00010) op = `OP_PCNT;
                             else begin end
@@ -81,9 +104,12 @@ module decoder(
                         else begin end
                     end
                     3'b101: begin // In this case, inst[31:25] is 0. So there is no need to modify imm.
-                        if (inst[31:25] == 7'b0000000) op = `OP_SRLI;
-                        else if (inst[31:25] == 7'b0100000) op = `OP_SRAI;
-                        else begin end
+                        imm = {27'b0, inst[24:20]};
+                        case (inst[31:25])
+                            7'b0000000: op = `OP_SRLI;
+                            7'b0100000: op = `OP_SRAI;
+                            default: begin end
+                        endcase
                     end
                     default: begin end
                 endcase
@@ -171,9 +197,13 @@ module decoder(
                 endcase
                 case (inst[14:12])
                     3'b011: op = `OP_CSRRC;
+                    3'b111: op = `OP_CSRRCI;
                     3'b010: op = `OP_CSRRS;
+                    3'b110: op = `OP_CSRRSI;
                     3'b001: op = `OP_CSRRW;
+                    3'b101: op = `OP_CSRRWI;
                     3'b000: casez (inst[31:7])
+                        25'b0001000000100000000000000: op = `OP_SRET;
                         25'b0000000000010000000000000: op = `OP_EBREAK;
                         25'b0000000000000000000000000: op = `OP_ECALL;
                         25'b0011000000100000000000000: op = `OP_MRET;

@@ -42,6 +42,7 @@
 `define OP_SLT `OP_LENGTH'h2d
 `define OP_SLTI `OP_LENGTH'h2e
 
+`define OP_SRET `OP_LENGTH'h2f
 `define OP_CSRRC `OP_LENGTH'h30
 `define OP_CSRRS `OP_LENGTH'h31
 `define OP_CSRRW `OP_LENGTH'h32
@@ -49,3 +50,6 @@
 `define OP_ECALL `OP_LENGTH'h34
 `define OP_MRET `OP_LENGTH'h35
 `define OP_SFENCE_VMA `OP_LENGTH'h36
+`define OP_CSRRCI `OP_LENGTH'h37
+`define OP_CSRRSI `OP_LENGTH'h38
+`define OP_CSRRWI `OP_LENGTH'h39
