@@ -1,5 +1,5 @@
-`define OP_LENGTH 6
-`define OP_LENGTH_1 5
+`define OP_LENGTH 7
+`define OP_LENGTH_1 6
 `define OP_INVALID `OP_LENGTH'h0
 `define OP_ADD `OP_LENGTH'h1
 `define OP_ADDI `OP_LENGTH'h2
@@ -53,3 +53,4 @@
 `define OP_CSRRCI `OP_LENGTH'h37
 `define OP_CSRRSI `OP_LENGTH'h38
 `define OP_CSRRWI `OP_LENGTH'h39
+`define OP_ADD16 `OP_LENGTH'h40

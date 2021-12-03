@@ -9,7 +9,7 @@ module decoder(
     output reg[4:0]         reg_s,
     output reg[4:0]         reg_t, // reg_t or csr reg
     output reg[4:0]         reg_d,
-    output reg[5:0]         op,
+    output reg[6:0]         op,
     output reg[31:0]        imm,
     output reg              imm_select,
     output reg[3:0]         cur_exception
@@ -77,6 +77,12 @@ module decoder(
                     10'b0000000_111: op = `OP_AND;
                     10'b0000000_101: op = `OP_SRL;
                     10'b0100000_101: op = `OP_SRA;
+                    default: begin end
+                endcase
+            end
+            7'b1110111: begin
+                case ({inst[31:25], inst[14:12]})
+                    10'b0100000_000: op = `OP_ADD16;
                     default: begin end
                 endcase
             end

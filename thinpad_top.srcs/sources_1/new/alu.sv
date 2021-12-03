@@ -52,7 +52,9 @@ module alu(
             `SLL: result = a << b[4:0];
             `SRL: result = a >> b[4:0];
             `SRA: result = $signed(a) >>> b[4:0];                
-            `ROL: result = (a << b) | (a >> (32 - b)); 
+            `ADD16: begin
+                result = {a[31:16] + b[31:16], a[15:0] + b[15:0]};
+            end
             `CLZ: begin  // vivado will optimize this code in the synthesis phase
                 casez(a)
                     32'b00000000000000000000000000000000: result = 32;

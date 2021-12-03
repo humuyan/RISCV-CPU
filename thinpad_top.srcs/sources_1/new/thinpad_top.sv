@@ -157,7 +157,7 @@ mem _mem(
 
 reg[31:0] reg_inst;
 wire[4:0] reg_s, reg_t, reg_d;
-wire[5:0] id_exe_op;
+wire[`OP_LENGTH_1:0] id_exe_op;
 wire[31:0] imm;
 wire imm_select;
 
@@ -220,6 +220,7 @@ always_comb begin
         `OP_SRA, `OP_SRAI: alu_op = `SRA;
         `OP_SUB: alu_op = `SUB;
         `OP_SLT, `OP_SLTI: alu_op = `SLT;
+        `OP_ADD16: alu_op = `ADD16;
         default: alu_op = `ZERO;
     endcase
 end
@@ -326,7 +327,7 @@ always_comb begin
     reg_we = 1'b0;
     if (~wb_nop) begin // when exception, current instruction shouldn't be WB.
         case (mem_wb_op)
-            `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SLTU, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_CSRRCI, `OP_CSRRSI, `OP_CSRRWI, `OP_SLTIU, `OP_XORI, `OP_SRA, `OP_SRAI, `OP_SUB, `OP_SLL, `OP_SRL, `OP_CLZ, `OP_PCNT, `OP_SBCLR, `OP_SLT, `OP_SLTI: begin
+            `OP_ADD, `OP_ADDI, `OP_AND, `OP_ANDI, `OP_AUIPC, `OP_LUI, `OP_OR, `OP_ORI, `OP_SLLI, `OP_SRLI, `OP_XOR, `OP_LB, `OP_LW, `OP_LH, `OP_LBU, `OP_LHU, `OP_SLTU, `OP_CSRRC, `OP_CSRRS, `OP_CSRRW, `OP_CSRRCI, `OP_CSRRSI, `OP_CSRRWI, `OP_SLTIU, `OP_XORI, `OP_SRA, `OP_SRAI, `OP_SUB, `OP_SLL, `OP_SRL, `OP_CLZ, `OP_PCNT, `OP_SBCLR, `OP_SLT, `OP_SLTI, `OP_ADD16: begin
                 reg_waddr = mem_reg_d;
                 reg_wdata = mem_exe_result;
                 reg_we = 1'b1;
